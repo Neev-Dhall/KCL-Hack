@@ -1,34 +1,51 @@
-// main.js — wires the game to the keyboard and runs the game loop.
+// main.js — wires the game, hand tracking, sound and keyboard together,
+// and runs the game loop.
 import './style.css';
 import * as game from './game.js';
-import { initHands, updateHands, swapHands, toggleTwistMode } from './hands.js';
+import { initHands, updateHands, swapHands, toggleTwistMode, toggleDebug } from './hands.js';
+import { unlockAudio, toggleMute, playEvent } from './sound.js';
+
+const guide = document.getElementById('guide');
+const soundState = document.getElementById('sound-state');
 
 game.init(document.getElementById('game'));
+game.onEvent(playEvent); // game events → sound effects
 initHands(); // async; the keyboard works while the camera loads (or if it's denied)
+
+// Browsers only allow sound after the user clicks or presses a key.
+window.addEventListener('pointerdown', unlockAudio);
 
 // ---------- Keyboard ----------
 // Keys whose default browser action (scrolling) we block.
 const BLOCKED = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'];
 
 window.addEventListener('keydown', (e) => {
+  unlockAudio();
   if (BLOCKED.includes(e.code)) e.preventDefault();
   const { status } = game.getState();
 
-  if (e.code === 'Enter' && (status === 'start' || status === 'over')) {
-    game.start();
-    return;
-  }
-  if (e.code === 'KeyP' && !e.repeat) {
-    game.togglePause();
-    return;
-  }
-  if (e.code === 'KeyS' && !e.repeat) {
-    swapHands();
-    return;
-  }
-  if (e.code === 'KeyT' && !e.repeat) {
-    toggleTwistMode();
-    return;
+  // Keys that work on any screen.
+  if (!e.repeat) {
+    switch (e.code) {
+      case 'Enter':
+        if (status === 'start' || status === 'over') game.start();
+        return;
+      case 'KeyP':
+        game.togglePause();
+        return;
+      case 'KeyS':
+        swapHands();
+        return;
+      case 'KeyT':
+        toggleTwistMode();
+        return;
+      case 'KeyD':
+        toggleDebug();
+        return;
+      case 'KeyM':
+        soundState.textContent = toggleMute() ? 'OFF' : 'ON';
+        return;
+    }
   }
   if (status !== 'playing') return;
 
@@ -70,6 +87,11 @@ function loop(now) {
   updateHands(); // runs hand detection once per new camera frame
   game.update(dt);
   game.draw();
+
+  // The gesture guide only shows before the first game.
+  const showGuide = game.getState().status === 'start';
+  if (guide.hidden === showGuide) guide.hidden = !showGuide;
+
   requestAnimationFrame(loop);
 }
 

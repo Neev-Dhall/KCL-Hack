@@ -42,6 +42,7 @@ const FAST_MOVE_DISTANCE = 0.5; // hand moved this far within the window → no 
 const GRAB_OPEN_CURL = 1.4; // curl above this counts as an open hand
 const GRAB_CLOSED_CURL = 1.05; // curl below this counts as a fist
 const GRAB_MAX_MS = 300; // open → fist must happen within this time
+const RESTART_GRAB_DELAY_MS = 1500; // on GAME OVER, wait this long before a grab can restart
 
 // ---------- MediaPipe setup ----------
 const MEDIAPIPE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
@@ -94,12 +95,22 @@ let cooldownUntil = 0; // performance.now() time when the post-slam cooldown end
 let grabArmed = false; // true once the hand has been seen open (re-armed by opening again)
 let lastOpenTime = 0; // last time the action hand was fully open
 
+// Debug panel (D key).
+let debugOn = false;
+let debugEl = null;
+let columnPos = 0; // palm position measured in columns (before hysteresis)
+let delegateUsed = '-'; // 'GPU' or 'CPU'
+let fps = 0; // tracking frames per second
+let fpsFrames = 0;
+let fpsStart = 0;
+
 // ---------- Setup ----------
 export async function initHands() {
   video = document.getElementById('cam');
   overlay = document.getElementById('overlay');
   octx = overlay.getContext('2d');
   statusEl = document.getElementById('hand-status');
+  debugEl = document.getElementById('debug');
 
   try {
     setStatus('Starting camera…');
@@ -128,9 +139,11 @@ export async function initHands() {
     });
     try {
       landmarker = await HandLandmarker.createFromOptions(fileset, options('GPU'));
+      delegateUsed = 'GPU';
     } catch (gpuErr) {
       console.warn('GPU delegate failed, using CPU:', gpuErr);
       landmarker = await HandLandmarker.createFromOptions(fileset, options('CPU'));
+      delegateUsed = 'CPU';
     }
   } catch (err) {
     console.warn('Hand tracker failed to load:', err);
@@ -145,6 +158,11 @@ export function swapHands() {
 
 export function isSwapped() {
   return swapped;
+}
+
+export function toggleDebug() {
+  debugOn = !debugOn;
+  debugEl.hidden = !debugOn;
 }
 
 export function toggleTwistMode() {
@@ -162,6 +180,14 @@ export function updateHands() {
   lastVideoTime = video.currentTime;
 
   const result = landmarker.detectForVideo(video, performance.now());
+
+  // Count tracking frames per second for the debug panel.
+  fpsFrames++;
+  if (performance.now() - fpsStart >= 1000) {
+    fps = fpsFrames;
+    fpsFrames = 0;
+    fpsStart = performance.now();
+  }
   assignRoles(result.landmarks || []);
   updateMoveHand();
   updateActionHand(performance.now());
@@ -211,6 +237,7 @@ function updateMoveHand() {
   const { start, end } = columnArea();
   const bandWidth = (end - start) / game.COLS;
   const pos = (moveHand.screenX - start) / bandWidth;
+  columnPos = pos;
   const clamp = (c) => Math.max(0, Math.min(game.COLS - 1, c));
 
   // Hysteresis: only switch once the palm is well past the current band's edge.
@@ -269,8 +296,17 @@ function updateGrab(hand, now, suppressed) {
   if (grabArmed && hand.curl < GRAB_CLOSED_CURL) {
     grabArmed = false; // must open again before the next grab
     const quick = now - lastOpenTime <= GRAB_MAX_MS;
-    if (quick && !suppressed) game.hold();
+    if (quick && !suppressed) onGrab();
   }
+}
+
+// A grab holds the piece while playing, and starts the game from the
+// start screen or (after a short delay) the game-over screen.
+function onGrab() {
+  const { status, statusTime } = game.getState();
+  if (status === 'playing') game.hold();
+  else if (status === 'start') game.start();
+  else if (status === 'over' && statusTime > RESTART_GRAB_DELAY_MS) game.start();
 }
 
 function isCoolingDown(now) {
@@ -562,6 +598,46 @@ function updateStatus() {
     line('MOVE', moveSide, moveHand, 'move', moveExtra) +
     line('ACTION', actionSide, actionHand, 'action', actionExtra) +
     `<div class="mode">ROTATE MODE: ${twistMode ? 'TWIST' : 'PINCH'} (T to switch)</div>`;
+
+  if (debugOn) renderDebug(now);
+}
+
+// D key: every live gesture value next to the threshold it's compared with.
+// A row lights up when its gesture is currently "on".
+function renderDebug(now) {
+  const n = (v, d = 2) => (v === null || v === undefined ? '—' : Number(v).toFixed(d));
+  const mv = moveHand;
+  const ac = actionHand;
+  const cooldownLeft = Math.max(0, cooldownUntil - now);
+  const sinceOpen = ac ? now - lastOpenTime : null;
+
+  const rows = [
+    ['TRACKER', `${delegateUsed} · ${fps} fps`, '', false],
+    ['— MOVE HAND', '', '', false],
+    ['column pos', mv ? n(columnPos) : '—', `±${COLUMN_HYSTERESIS} past edge`, false],
+    ['curl (fist)', mv ? n(mv.curl) : '—', `on <${FIST_ON_CURL} · off >${FIST_OFF_CURL}`, fist],
+    ['— ACTION HAND', '', '', false],
+    ['twist °', twistMode && ac ? n(twistDelta, 0) : '—', `±${TWIST_TRIGGER_DEG} fire · ±${TWIST_REARM_DEG} re-arm`, twistMode && !twistArmed],
+    ['pinch idx', !twistMode && ac ? n(pinchIndexGap) : '—', `on <${PINCH_ON} · off >${PINCH_OFF}`, pinchCW],
+    ['pinch mid', !twistMode && ac ? n(pinchMiddleGap) : '—', `on <${PINCH_ON} · off >${PINCH_OFF}`, pinchCCW],
+    ['pinky open', !twistMode && ac ? n(dist(ac.pts[20], ac.pts[0]) / ac.palm) : '—', `>${PINKY_OPEN}`, false],
+    ['slam drop', ac ? n(slamDrop) : '—', `≥${SLAM_DISTANCE} in ${SLAM_WINDOW_MS}ms`, cooldownLeft > 0],
+    ['motion', ac ? n(handMotion) : '—', `>${FAST_MOVE_DISTANCE} blocks`, handMotion > FAST_MOVE_DISTANCE],
+    ['cooldown ms', n(cooldownLeft, 0), `${SLAM_COOLDOWN_MS}`, cooldownLeft > 0],
+    ['curl (grab)', ac ? n(ac.curl) : '—', `open >${GRAB_OPEN_CURL} → fist <${GRAB_CLOSED_CURL}`, false],
+    ['since open ms', ac && grabArmed ? n(sinceOpen, 0) : '—', `≤${GRAB_MAX_MS}`, grabArmed],
+  ];
+
+  debugEl.innerHTML =
+    '<table>' +
+    rows
+      .map(([name, value, threshold, on]) =>
+        name.startsWith('—')
+          ? `<tr class="head"><td colspan="3">${name}</td></tr>`
+          : `<tr class="${on ? 'on' : ''}"><td>${name}</td><td>${value}</td><td>${threshold}</td></tr>`
+      )
+      .join('') +
+    '</table>';
 }
 
 function setStatus(text) {

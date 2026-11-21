@@ -69,6 +69,20 @@ let softDrop = false;
 let flashText = '';
 let flashTime = 0;
 
+let statusSince = 0; // performance.now() when the game last started or ended
+
+// ---------- Events (used by main.js for sounds) ----------
+// Events: 'start', 'rotate', 'hold', 'slam', 'clear' (lines), 'levelup' (level), 'gameover'
+let listener = () => {};
+
+export function onEvent(fn) {
+  listener = fn;
+}
+
+function emit(name, value) {
+  listener(name, value);
+}
+
 // ---------- Setup ----------
 export function init(canvasEl) {
   canvas = canvasEl;
@@ -91,6 +105,8 @@ export function start() {
   softDrop = false;
   flashTime = 0;
   status = 'playing';
+  statusSince = performance.now();
+  emit('start');
   spawn(nextType());
 }
 
@@ -120,7 +136,9 @@ function spawn(type) {
   gravityTimer = 0;
   if (collides(piece.matrix, piece.x, piece.y)) {
     status = 'over';
+    statusSince = performance.now();
     flash('GAME OVER');
+    emit('gameover');
   }
 }
 
@@ -225,8 +243,10 @@ function clearLines() {
   if (newLevel > level) {
     level = newLevel;
     flash('LEVEL ' + level);
+    emit('levelup', level);
   } else {
     flash(LINE_NAMES[cleared]);
+    emit('clear', cleared);
   }
 }
 
@@ -248,6 +268,7 @@ export function rotate(dir) {
     if (!collides(rotated, piece.x + kick, piece.y)) {
       piece.matrix = rotated;
       piece.x += kick;
+      emit('rotate');
       return;
     }
   }
@@ -259,6 +280,7 @@ export function hardDrop() {
   score += (target - piece.y) * 2;
   piece.y = target;
   flash('SLAM');
+  emit('slam');
   lockPiece();
 }
 
@@ -273,6 +295,7 @@ export function hold() {
   holdType = current;
   canHold = false;
   flash('HOLD');
+  emit('hold');
 }
 
 export function setSoftDrop(on) {
@@ -287,6 +310,7 @@ export function togglePause() {
 export function getState() {
   return {
     status,
+    statusTime: performance.now() - statusSince, // ms since the game started or ended
     score,
     lines,
     level,
@@ -437,7 +461,8 @@ function drawOverlay() {
     glowText('GAME', BOARD_W / 2, 220, 28, '#ff2bd6');
     glowText('OVER', BOARD_W / 2, 265, 28, '#ff2bd6');
     glowText('SCORE ' + score, BOARD_W / 2, 320, 12, '#c6ff00');
-    blinkText('ENTER TO RETRY', BOARD_W / 2, 370, 10);
+    blinkText('GRAB OR ENTER', BOARD_W / 2, 370, 10);
+    blinkText('TO RETRY', BOARD_W / 2, 390, 10);
   }
 }
 
