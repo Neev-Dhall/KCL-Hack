@@ -16,7 +16,7 @@
 
 <img src="docs/media/demo.gif" alt="Hand Stack gameplay: pieces fall, line clears flash SINGLE, hold and next previews update" width="720">
 
-[▶ Watch the full gameplay clip (42 s)](docs/media/gameplay.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [How it works](#-how-it-works)
+[▶ Watch the full gameplay clip (42 s)](docs/media/gameplay.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [Bonus: Hand Glide](#-bonus-game-hand-glide) · [How it works](#-how-it-works)
 
 </div>
 
@@ -124,6 +124,21 @@ You go up a level every 10 lines. Gravity starts at 800 ms per row and gets 70 m
 
 ---
 
+## 🌠 Bonus game: Hand Glide
+
+A second, one-button arcade game using the same hand tracking. Steer a glowing comet through gaps in neon laser gates over a synthwave grid. **Close either hand into a fist to flap.** Open it again, then make another fist for the next flap.
+
+| Start | In flight |
+|---|---|
+| <img src="docs/media/glide-start.png" alt="Hand Glide start screen: comet over a striped synthwave sun, MAKE A FIST TO FLAP"> | <img src="docs/media/glide-play.png" alt="Hand Glide in flight: comet with trail between neon laser gates"> |
+
+- Open it from the **PLAY HAND GLIDE ▶** link under the Hand Stack title, or go to `/glide.html`.
+- Keyboard and mouse work too: **Space**, **↑** or **click** to flap, **P** to pause, **M** to mute.
+- The gaps get narrower and the scroll speed rises as your score climbs. Every 10 gates plays a jingle and speeds up the music.
+- Your best score is kept in your browser.
+
+---
+
 ## 🧠 How it works
 
 ```mermaid
@@ -145,6 +160,9 @@ The code is split so each file has one job, and the hand code can only reach the
 | [`src/hands.js`](src/hands.js) | Camera, MediaPipe hand tracking and gesture detection. It only calls the API that `game.js` exports. **Every gesture threshold is in one commented block at the top of the file.** |
 | [`src/sound.js`](src/sound.js) | Sound effects and an original 4-bar chiptune loop (Am–F–C–G), played by a small step sequencer on the Web Audio clock. |
 | [`src/main.js`](src/main.js) | Wires it all together: keyboard, sound, music, screens and the game loop. |
+| [`src/glide.js`](src/glide.js) + [`glide.html`](glide.html) | Hand Glide: physics, gates, drawing and fist-to-flap, with all tuning numbers at the top. |
+| [`src/tracker.js`](src/tracker.js) | Shared webcam + MediaPipe setup and hand measuring, used by Hand Glide. |
+| [`vite.config.js`](vite.config.js) | Builds both pages. |
 
 ### Gesture tricks
 
