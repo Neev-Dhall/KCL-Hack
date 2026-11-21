@@ -20,6 +20,18 @@ const COLUMN_HYSTERESIS = 0.2; // palm must go 0.2 of a column past a boundary t
 const FIST_ON_CURL = 1.05; // curl below this → soft drop on
 const FIST_OFF_CURL = 1.4; // curl above this → soft drop off
 
+// --- Action hand: wrist twist = rotate ---
+const TWIST_SIGN = 1; // set to -1 if twisting rotates the wrong way
+const TWIST_SMOOTHING = 0.5; // EMA alpha for the knuckle-line angle (1 = no smoothing)
+const TWIST_TRIGGER_DEG = 35; // turn this far from neutral to rotate once
+const TWIST_REARM_DEG = 15; // come back within this to allow the next twist
+const NEUTRAL_DRIFT = 0.02; // inside the re-arm zone, neutral moves 2%/frame toward the hand
+
+// --- Action hand: pinch backup mode (T key) ---
+const PINCH_ON = 0.45; // thumb tip within this of index tip (↻) or middle tip (↺)
+const PINCH_OFF = 0.6; // released once the gap is above this
+const PINKY_OPEN = 1.0; // pinky tip must be this far from the wrist for a pinch to count
+
 // ---------- MediaPipe setup ----------
 const MEDIAPIPE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const WASM_URL = MEDIAPIPE_URL + '/wasm';
@@ -53,6 +65,17 @@ let actionHand = null;
 // Move-hand gesture state.
 let column = null; // board column the palm is over (null = hand not seen)
 let fist = false; // soft drop currently on because of a fist
+
+// Action-hand gesture state.
+let twistMode = true; // T key toggles: true = wrist twist, false = pinch
+let twistAngle = null; // smoothed knuckle-line angle in degrees (null = hand not seen)
+let neutralAngle = null; // the hand's "resting" angle
+let twistDelta = 0; // current angle relative to neutral
+let twistArmed = true; // false after a twist, until the hand comes back to neutral
+let pinchCW = false; // thumb+index currently pinched
+let pinchCCW = false; // thumb+middle currently pinched
+let pinchIndexGap = 0; // latest pinch distances (shown in the status / debug)
+let pinchMiddleGap = 0;
 
 // ---------- Setup ----------
 export async function initHands() {
@@ -107,6 +130,12 @@ export function isSwapped() {
   return swapped;
 }
 
+export function toggleTwistMode() {
+  twistMode = !twistMode;
+  pinchCW = pinchCCW = false;
+  twistArmed = true;
+}
+
 // ---------- Per-frame update (called from the game loop) ----------
 export function updateHands() {
   if (!landmarker || video.readyState < 2) return;
@@ -118,6 +147,7 @@ export function updateHands() {
   const result = landmarker.detectForVideo(video, performance.now());
   assignRoles(result.landmarks || []);
   updateMoveHand();
+  updateActionHand();
 
   drawOverlay();
   updateStatus();
@@ -187,6 +217,74 @@ function updateMoveHand() {
   }
 }
 
+// ---------- Action hand: rotate ----------
+function updateActionHand() {
+  if (!actionHand) {
+    // Forget everything so the next time the hand appears it starts fresh.
+    twistAngle = neutralAngle = null;
+    twistDelta = 0;
+    twistArmed = true;
+    pinchCW = pinchCCW = false;
+    return;
+  }
+  if (twistMode) updateTwist(actionHand);
+  else updatePinch(actionHand);
+}
+
+// Wrap an angle difference into -180..180 so 179° → -179° isn't a 358° jump.
+function wrapDeg(a) {
+  return ((((a + 180) % 360) + 360) % 360) - 180;
+}
+
+function updateTwist(hand) {
+  // Angle of the line from the index knuckle (5) to the pinky knuckle (17).
+  const a = hand.pts[5];
+  const b = hand.pts[17];
+  const raw = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+
+  if (twistAngle === null) {
+    // Hand just appeared: its current angle becomes neutral.
+    twistAngle = raw;
+    neutralAngle = raw;
+  } else {
+    twistAngle += TWIST_SMOOTHING * wrapDeg(raw - twistAngle);
+  }
+
+  twistDelta = wrapDeg(twistAngle - neutralAngle) * TWIST_SIGN;
+
+  if (Math.abs(twistDelta) <= TWIST_REARM_DEG) {
+    // Resting near neutral: re-arm, and let neutral slowly follow the hand.
+    twistArmed = true;
+    neutralAngle += NEUTRAL_DRIFT * wrapDeg(twistAngle - neutralAngle);
+  } else if (twistArmed && twistDelta >= TWIST_TRIGGER_DEG) {
+    twistArmed = false;
+    game.rotate(1); // clockwise
+  } else if (twistArmed && twistDelta <= -TWIST_TRIGGER_DEG) {
+    twistArmed = false;
+    game.rotate(-1); // anticlockwise
+  }
+}
+
+function updatePinch(hand) {
+  const p = hand.pts;
+  pinchIndexGap = dist(p[4], p[8]) / hand.palm;
+  pinchMiddleGap = dist(p[4], p[12]) / hand.palm;
+  const pinkyOpen = dist(p[20], p[0]) / hand.palm > PINKY_OPEN;
+
+  // Release first (always allowed), then look for a new pinch.
+  if (pinchCW && pinchIndexGap > PINCH_OFF) pinchCW = false;
+  if (pinchCCW && pinchMiddleGap > PINCH_OFF) pinchCCW = false;
+  if (!pinkyOpen) return; // a closing fist isn't a pinch
+
+  if (!pinchCW && !pinchCCW && pinchIndexGap < PINCH_ON) {
+    pinchCW = true;
+    game.rotate(1);
+  } else if (!pinchCW && !pinchCCW && pinchMiddleGap < PINCH_ON) {
+    pinchCCW = true;
+    game.rotate(-1);
+  }
+}
+
 // ---------- Helper measures ----------
 // Turn a raw landmark into mirrored, aspect-corrected screen coordinates.
 // x is scaled by the aspect ratio so x and y distances are comparable.
@@ -234,6 +332,77 @@ function drawOverlay() {
 
   if (moveHand) drawSkeleton(moveHand, MOVE_COLOR);
   if (actionHand) drawSkeleton(actionHand, ACTION_COLOR);
+
+  drawDial();
+}
+
+// Small dial in the action hand's bottom corner. "Up" is neutral; the
+// green wedge is the ±15° re-arm zone, pink ticks are the ±35° triggers,
+// and the needle is the hand's current twist.
+function drawDial() {
+  const r = 26;
+  const cx = swapped ? r + 10 : overlay.width - r - 10;
+  const cy = overlay.height - r - 10;
+  const up = -Math.PI / 2;
+  const rad = (deg) => up + (deg * Math.PI) / 180;
+
+  octx.save();
+  octx.fillStyle = 'rgba(6, 10, 31, 0.75)';
+  octx.beginPath();
+  octx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+  octx.fill();
+
+  octx.font = '6px "Press Start 2P", monospace';
+  octx.textAlign = 'center';
+
+  if (!twistMode) {
+    octx.fillStyle = ACTION_COLOR;
+    octx.fillText('PINCH', cx, cy - 2);
+    octx.fillText(pinchCW ? '↻' : pinchCCW ? '↺' : '·', cx, cy + 10);
+    octx.restore();
+    return;
+  }
+
+  // Re-arm zone.
+  octx.fillStyle = 'rgba(0, 255, 163, 0.25)';
+  octx.beginPath();
+  octx.moveTo(cx, cy);
+  octx.arc(cx, cy, r, rad(-TWIST_REARM_DEG), rad(TWIST_REARM_DEG));
+  octx.closePath();
+  octx.fill();
+
+  // Dial ring.
+  octx.strokeStyle = 'rgba(255, 43, 214, 0.5)';
+  octx.lineWidth = 1.5;
+  octx.beginPath();
+  octx.arc(cx, cy, r, 0, Math.PI * 2);
+  octx.stroke();
+
+  // Trigger marks.
+  octx.strokeStyle = ACTION_COLOR;
+  octx.lineWidth = 3;
+  for (const deg of [-TWIST_TRIGGER_DEG, TWIST_TRIGGER_DEG]) {
+    const a = rad(deg);
+    octx.beginPath();
+    octx.moveTo(cx + Math.cos(a) * (r - 7), cy + Math.sin(a) * (r - 7));
+    octx.lineTo(cx + Math.cos(a) * (r + 3), cy + Math.sin(a) * (r + 3));
+    octx.stroke();
+  }
+
+  // Needle (grey while waiting to re-arm, hidden when no action hand).
+  if (twistAngle !== null) {
+    const a = rad(Math.max(-90, Math.min(90, twistDelta)));
+    octx.strokeStyle = twistArmed ? '#ffffff' : '#7a7f99';
+    octx.lineWidth = 2;
+    octx.beginPath();
+    octx.moveTo(cx, cy);
+    octx.lineTo(cx + Math.cos(a) * (r - 2), cy + Math.sin(a) * (r - 2));
+    octx.stroke();
+  }
+
+  octx.fillStyle = ACTION_COLOR;
+  octx.fillText('TWIST', cx, cy + r - 4);
+  octx.restore();
 }
 
 // 10 numbered bands across the move hand's area; the palm's band lights up.
@@ -296,8 +465,13 @@ function updateStatus() {
   const line = (name, side, hand, cls, extra) =>
     `<div class="${cls}">${name} (${side}): ${hand ? 'TRACKING · curl ' + hand.curl.toFixed(2) + extra : 'not seen'}</div>`;
   const moveExtra = column === null ? '' : ` · COL ${column + 1}${fist ? ' · FIST' : ''}`;
+  const actionExtra = twistMode
+    ? ` · TWIST ${twistDelta >= 0 ? '+' : ''}${Math.round(twistDelta)}°${twistArmed ? '' : ' (re-arm)'}`
+    : ` · PINCH ${pinchIndexGap.toFixed(2)}/${pinchMiddleGap.toFixed(2)}`;
   statusEl.innerHTML =
-    line('MOVE', moveSide, moveHand, 'move', moveExtra) + line('ACTION', actionSide, actionHand, 'action', '');
+    line('MOVE', moveSide, moveHand, 'move', moveExtra) +
+    line('ACTION', actionSide, actionHand, 'action', actionExtra) +
+    `<div class="mode">ROTATE MODE: ${twistMode ? 'TWIST' : 'PINCH'} (T to switch)</div>`;
 }
 
 function setStatus(text) {

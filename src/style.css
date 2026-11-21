@@ -140,3 +140,8 @@ footer {
 #hand-status .action {
   color: var(--pink);
 }
+
+#hand-status .mode {
+  color: #ffe600;
+  opacity: 0.8;
+}

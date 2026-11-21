@@ -1,7 +1,7 @@
 // main.js — wires the game to the keyboard and runs the game loop.
 import './style.css';
 import * as game from './game.js';
-import { initHands, updateHands, swapHands } from './hands.js';
+import { initHands, updateHands, swapHands, toggleTwistMode } from './hands.js';
 
 game.init(document.getElementById('game'));
 initHands(); // async; the keyboard works while the camera loads (or if it's denied)
@@ -24,6 +24,10 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.code === 'KeyS' && !e.repeat) {
     swapHands();
+    return;
+  }
+  if (e.code === 'KeyT' && !e.repeat) {
+    toggleTwistMode();
     return;
   }
   if (status !== 'playing') return;
