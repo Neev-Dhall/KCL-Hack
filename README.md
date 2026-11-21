@@ -127,7 +127,7 @@ You go up a level every 10 lines. Gravity starts at 800 ms per row and gets 70 m
 
 A second arcade game using the same hand tracking. Steer a glowing comet through gaps in neon laser gates over a synthwave grid. It has two control modes (**T** switches):
 
-- **FLAP mode:** close either hand into a fist to flap. Open it again, then make another fist for the next flap.
+- **FLAP mode:** squeeze either hand to flap. Quick half-squeezes count, so you don't need to open fully between flaps.
 - **STEER mode:** the comet follows your palm's height. Raise your hand to climb and lower it to dive. If your hand leaves the camera, gravity takes over.
 
 | Start | In flight |

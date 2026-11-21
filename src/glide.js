@@ -14,12 +14,12 @@ const H = 600;
 const FLOOR_Y = 560; // top of the neon floor
 const ORB_X = 130; // the comet's fixed x position
 const ORB_R = 11; // comet radius
-const GRAVITY = 1500; // px/s²
-const FLAP_VELOCITY = -430; // px/s (negative = up)
-const MAX_FALL = 620; // px/s
+const GRAVITY = 1150; // px/s² (floaty, so hand flaps have time)
+const FLAP_VELOCITY = -390; // px/s (negative = up)
+const MAX_FALL = 520; // px/s
 const GATE_W = 58; // gate thickness
 const GATE_SPACING = 240; // horizontal distance between gates
-const GAP_START = 185; // opening size at the start…
+const GAP_START = 195; // opening size at the start…
 const GAP_MIN = 135; // …shrinking to this
 const GAP_SHRINK = 2.5; // px smaller per gate passed
 const SPEED_START = 150; // scroll speed px/s…
@@ -32,8 +32,10 @@ const RESTART_DELAY_MS = 800; // after a crash, wait this long before a flap res
 const SHAKE_MS = 350; // screen shake after a crash
 
 // FLAP mode: fist = flap (either hand). Curl = avg fingertip→wrist distance in palm lengths.
-const FIST_CURL = 1.05; // curl below this = fist → flap
-const OPEN_CURL = 1.4; // hand must open above this before the next fist counts
+// A flap is a SQUEEZE: curl dropping quickly from its recent high, so quick
+// half-open / half-close pumps count (you don't have to open fully each time).
+const SQUEEZE_DROP = 0.35; // curl falls this much below its recent high → flap
+const REOPEN_RISE = 0.2; // curl rises this much above its recent low → ready again
 
 // STEER mode: palm height in the camera frame (0 = top, 1 = bottom) → comet height.
 const STEER_TOP = 0.2; // palm this high in the frame = top of the sky
@@ -76,7 +78,8 @@ let debugOn = false;
 
 // Hand state.
 let latestHands = [];
-const sides = { left: { armed: false, curl: null }, right: { armed: false, curl: null } };
+// Per screen side: { armed, curl, high, low } — see updateSqueeze().
+const sides = { left: newSqueeze(), right: newSqueeze() };
 let steerHand = null; // the hand currently steering (STEER mode)
 let steerPalmY = null; // palm height (0..1) of the steering hand
 let lastHandSeen = -Infinity;
@@ -280,25 +283,18 @@ function updateHands() {
     steerHand = null;
   }
 
-  // Fists: flap in FLAP mode; in both modes a fist starts / restarts the game.
+  // Squeezes: flap in FLAP mode; in both modes a squeeze starts / restarts the game.
   const bySide = { left: null, right: null };
   for (const h of hands) bySide[h.screenX < 0.5 ? 'left' : 'right'] = h;
   for (const side of ['left', 'right']) {
     const h = bySide[side];
-    const s = sides[side];
-    s.curl = h ? h.curl : null;
     if (!h) {
-      s.armed = false;
+      sides[side] = newSqueeze(); // forget this side until a hand shows up again
       continue;
     }
-    if (h.curl > OPEN_CURL) {
-      s.armed = true; // open hand: the next fist will count
-    } else if (s.armed && h.curl < FIST_CURL) {
-      s.armed = false; // must open again before the next fist
-      if (mode === 'flap' || state !== 'playing') {
-        flashUntil = now + 220;
-        flap();
-      }
+    if (updateSqueeze(sides[side], h.curl) && (mode === 'flap' || state !== 'playing')) {
+      flashUntil = now + 220;
+      flap();
     }
   }
 
@@ -310,6 +306,39 @@ function updateHands() {
   statusEl.innerHTML =
     line('left', 'move') + line('right', 'action') + `<div class="mode">MODE: ${mode.toUpperCase()} (T to switch)</div>`;
   if (debugOn) renderDebug(now);
+}
+
+// ---------- Squeeze detector (one per screen side) ----------
+function newSqueeze() {
+  return { armed: false, curl: null, high: null, low: null };
+}
+
+// Returns true once per squeeze. While armed it tracks the highest curl seen;
+// a drop of SQUEEZE_DROP below that = flap. Then it tracks the lowest curl,
+// and re-arms once the hand opens REOPEN_RISE above it.
+function updateSqueeze(s, curl) {
+  s.curl = curl;
+  if (s.high === null) {
+    // New hand: ready straight away, measured from where it is now.
+    s.armed = true;
+    s.high = s.low = curl;
+    return false;
+  }
+  if (s.armed) {
+    s.high = Math.max(s.high, curl);
+    if (s.high - curl >= SQUEEZE_DROP) {
+      s.armed = false;
+      s.low = curl;
+      return true;
+    }
+  } else {
+    s.low = Math.min(s.low, curl);
+    if (curl - s.low >= REOPEN_RISE) {
+      s.armed = true;
+      s.high = curl;
+    }
+  }
+  return false;
 }
 
 function drawOverlay() {
@@ -354,14 +383,22 @@ function drawOverlay() {
   }
 }
 
+// Debug text: how far the hand has squeezed (or re-opened) vs the threshold.
+function sqzInfo(s) {
+  if (s.curl === null) return `drop ${SQUEEZE_DROP} · rise ${REOPEN_RISE}`;
+  return s.armed
+    ? `squeeze ${(s.high - s.curl).toFixed(2)} / ${SQUEEZE_DROP}`
+    : `re-open ${(s.curl - s.low).toFixed(2)} / ${REOPEN_RISE}`;
+}
+
 // D key: live hand values next to their thresholds.
 function renderDebug() {
   const n = (v, d = 2) => (v === null || v === undefined ? '—' : Number(v).toFixed(d));
   const rows = [
     ['TRACKER', `${fps} fps · ${latestHands.length} hand(s)`, '', false],
     ['mode', mode.toUpperCase(), 'T to switch', false],
-    ['left curl', n(sides.left.curl), `<${FIST_CURL} · >${OPEN_CURL}`, sides.left.armed],
-    ['right curl', n(sides.right.curl), `<${FIST_CURL} · >${OPEN_CURL}`, sides.right.armed],
+    ['left curl', n(sides.left.curl), sqzInfo(sides.left), sides.left.armed],
+    ['right curl', n(sides.right.curl), sqzInfo(sides.right), sides.right.armed],
     ['palm height', n(steerPalmY), `${STEER_TOP} top → ${STEER_BOTTOM} floor`, isSteering()],
     ['comet y', n(y, 0), `0 → ${FLOOR_Y}`, false],
   ];
@@ -376,7 +413,7 @@ function renderDebug() {
 function renderControls() {
   controlsEl.innerHTML =
     mode === 'flap'
-      ? `<div class="ctl-col move"><b>FLAP MODE</b><span>OPEN, THEN FIST · FLAP</span><span>EITHER HAND WORKS</span></div>
+      ? `<div class="ctl-col move"><b>FLAP MODE</b><span>SQUEEZE HAND · FLAP</span><span>EITHER HAND WORKS</span></div>
          <div class="ctl-col action"><b>GOAL</b><span>FLY THROUGH GAPS</span><span>T · TRY STEER MODE</span></div>`
       : `<div class="ctl-col move"><b>STEER MODE</b><span>RAISE HAND · GO UP</span><span>LOWER HAND · GO DOWN</span></div>
          <div class="ctl-col action"><b>GOAL</b><span>KEEP HAND IN VIEW</span><span>T · BACK TO FLAP</span></div>`;
@@ -597,14 +634,14 @@ function drawHud() {
     glowText('GLIDE', W / 2, 218, 34, '#00e5ff');
     glowText(mode === 'flap' ? '◀ FLAP MODE ▶' : '◀ STEER MODE ▶', W / 2, 330, 10, '#ffe600');
     if (mode === 'flap') {
-      glowText('MAKE A FIST TO FLAP', W / 2, 362, 11, '#c6ff00');
-      glowText('either hand works', W / 2, 384, 8, '#8fa3ff');
+      glowText('SQUEEZE YOUR HAND TO FLAP', W / 2, 362, 10, '#c6ff00');
+      glowText('quick half-squeezes work', W / 2, 384, 8, '#8fa3ff');
     } else {
       glowText('RAISE / LOWER YOUR HAND', W / 2, 362, 11, '#c6ff00');
       glowText('the comet follows your palm', W / 2, 384, 8, '#8fa3ff');
     }
     glowText('T to switch mode', W / 2, 404, 8, '#8fa3ff');
-    if (blink()) glowText('FIST OR SPACE TO START', W / 2, 444, 10, '#ffffff');
+    if (blink()) glowText('SQUEEZE OR SPACE TO START', W / 2, 444, 10, '#ffffff');
     if (best[mode]) glowText('BEST ' + best[mode], W / 2, 480, 9, '#8fa3ff');
   }
   if (state === 'paused') {
@@ -620,7 +657,7 @@ function drawHud() {
     glowText('SCORE ' + score, W / 2, 280, 14, '#c6ff00');
     glowText('BEST ' + best[mode], W / 2, 308, 10, '#8fa3ff');
     if (blink() && performance.now() - overAt > RESTART_DELAY_MS) {
-      glowText('FIST OR SPACE TO RETRY', W / 2, 380, 10, '#ffffff');
+      glowText('SQUEEZE OR SPACE TO RETRY', W / 2, 380, 10, '#ffffff');
     }
     glowText('T to switch mode', W / 2, 410, 8, '#8fa3ff');
   }
