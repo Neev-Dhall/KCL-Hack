@@ -33,6 +33,7 @@ const best = {
   stack: readNumber('handarcade.best.stack'),
   // Hand Glide keeps one best per control mode; show the highest.
   glide: Math.max(...['handglide-best', 'handglide-best-wings', 'handglide-best-steer'].map(readNumber)),
+  whack: readNumber('handarcade.best.whack'),
 };
 for (const el of document.querySelectorAll('[data-best]')) el.textContent = best[el.dataset.best];
 
@@ -327,7 +328,87 @@ function makeGlideDemo(canvas) {
 const demos = [
   makeStackDemo(cabinets[0].querySelector('.cab-screen')),
   makeGlideDemo(cabinets[1].querySelector('.cab-screen')),
+  makeWhackDemo(cabinets[2].querySelector('.cab-screen')),
 ];
+
+// ---------- Attract mode: Hand Whack ----------
+function makeWhackDemo(canvas) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const holes = [0, 1, 2].flatMap((r) => [0, 1, 2].map((c) => ({ x: 32 + c * 58, y: 85 + r * 55 })));
+  let moles = []; // { hole, age, life, hit }
+  let hammer = { x: W / 2, y: H / 2, target: null, swing: 0 };
+  let spawn = 0;
+
+  return (dt) => {
+    spawn -= dt;
+    if (spawn <= 0 && moles.length < 2) {
+      const free = holes.map((_, i) => i).filter((i) => !moles.some((m) => m.hole === i));
+      moles.push({ hole: free[Math.floor(Math.random() * free.length)], age: 0, life: 1400, hit: null });
+      spawn = 500 + Math.random() * 400;
+    }
+    for (const m of moles) m.age += dt;
+    moles = moles.filter((m) => (m.hit === null ? m.age < m.life : m.age - m.hit < 300));
+
+    // The demo hammer glides to the oldest mole and bops it.
+    const target = moles.find((m) => m.hit === null && m.age > 250);
+    if (target) {
+      const h = holes[target.hole];
+      hammer.x += (h.x - hammer.x) * 0.15;
+      hammer.y += (h.y - 22 - hammer.y) * 0.15;
+      if (Math.hypot(h.x - hammer.x, h.y - 22 - hammer.y) < 4) {
+        target.hit = target.age;
+        hammer.swing = 1;
+      }
+    }
+    hammer.swing = Math.max(0, hammer.swing - dt / 180);
+
+    ctx.fillStyle = '#050816';
+    ctx.fillRect(0, 0, W, H);
+    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#c6ff00';
+    ctx.fillText('WHACK!', W / 2, 36);
+    holes.forEach((h, i) => {
+      ctx.fillStyle = '#02030b';
+      ctx.strokeStyle = '#a259ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(h.x, h.y, 22, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      const m = moles.find((m) => m.hole === i);
+      if (!m) return;
+      const up = m.hit !== null ? 1 - (m.age - m.hit) / 300 : Math.min(1, m.age / 120, (m.life - m.age) / 120);
+      if (up <= 0) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(h.x - 24, h.y - 50, 48, 50);
+      ctx.clip();
+      ctx.fillStyle = m.hit !== null ? '#c6ff00' : '#a259ff';
+      ctx.shadowColor = '#00e5ff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(h.x, h.y + 14 - 28 * up, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(h.x - 6, h.y + 8 - 28 * up, 3, 3);
+      ctx.fillRect(h.x + 3, h.y + 8 - 28 * up, 3, 3);
+      ctx.restore();
+    });
+    ctx.save();
+    ctx.translate(hammer.x, hammer.y);
+    ctx.rotate(-0.6 + hammer.swing);
+    ctx.shadowColor = '#ff2bd6';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#c9b8ff';
+    ctx.fillRect(-2, -4, 4, 26);
+    ctx.fillStyle = '#ff2bd6';
+    ctx.fillRect(-11, -13, 22, 11);
+    ctx.restore();
+  };
+}
 
 // ---------- Loop ----------
 let last = performance.now();

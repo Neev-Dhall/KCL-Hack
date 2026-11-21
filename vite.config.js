@@ -1,5 +1,5 @@
-// Three pages: the Hand Arcade lobby (index.html), Hand Stack (stack.html)
-// and Hand Glide (glide.html).
+// Four pages: the Hand Arcade lobby (index.html), Hand Stack (stack.html),
+// Hand Glide (glide.html) and Hand Whack (whack.html).
 import { defineConfig } from 'vite';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +16,7 @@ export default defineConfig({
         main: resolve(root, 'index.html'),
         stack: resolve(root, 'stack.html'),
         glide: resolve(root, 'glide.html'),
+        whack: resolve(root, 'whack.html'),
       },
     },
   },

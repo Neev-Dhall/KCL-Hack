@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hand Whack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <header>
+      <h1><span class="pink">HAND</span> <span class="cyan">WHACK</span></h1>
+      <p class="tagline">bop the neon moles before they duck</p>
+      <p class="nav"><a class="nav-link" href="./">◀ ARCADE</a></p>
+    </header>
+
+    <main id="layout">
+      <canvas id="whack" width="480" height="600"></canvas>
+
+      <section id="camera-panel">
+        <div id="cam-box">
+          <video id="cam" playsinline muted></video>
+          <canvas id="overlay" width="320" height="240"></canvas>
+          <div id="cam-message" hidden></div>
+        </div>
+        <div id="hand-status">Waiting for camera…</div>
+
+        <div id="debug" hidden>Waiting for the hand tracker…</div>
+        <div id="controls"></div>
+      </section>
+    </main>
+
+    <footer id="keys">
+      1–9 or click whack · SPACE start · P pause · ESC arcade · D debug · M sound:
+      <span id="sound-state">ON</span>
+    </footer>
+
+    <script type="module" src="/src/whack.js"></script>
+  </body>
+</html>
