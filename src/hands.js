@@ -20,21 +20,20 @@ const COLUMN_HYSTERESIS = 0.2; // palm must go 0.2 of a column past a boundary t
 const FIST_ON_CURL = 1.05; // curl below this → soft drop on
 const FIST_OFF_CURL = 1.4; // curl above this → soft drop off
 
-// --- Action hand: finger poses ---
+// --- Action hand: two-finger pose (used by the swish = hold) ---
 // A finger's "extension" = its tip's distance from the wrist (open ≈ 1.9, curled ≈ 1.0).
 const FINGER_OUT = 1.5; // index + middle extension above this = "out"
 const FINGER_IN = 1.3; // ring + pinky extension below this = "curled"
-const THUMB_OUT = 0.6; // thumb tip this far from the index knuckle (5) = thumb "out"
-const POSE_SLACK = 0.15; // once in a pose, it can slip this much before it's lost (no flicker)
 
-// --- Action hand: bolt twist = rotate ---
-// Hold thumb + index + middle out (ring + pinky curled) and turn your hand
-// like undoing a bolt. Twisting only counts while you hold that pose, so
-// drop the pose to bring your hand back without rotating. Keep turning
-// while in the pose to rotate again (each rotation re-zeroes the dial).
-const TWIST_SIGN = 1; // set to -1 if twisting rotates the wrong way
+// --- Action hand: wrist twist = rotate (anticlockwise only) ---
+// Palm facing the camera, turn your hand to the LEFT like a dial: the piece
+// rotates 90° anticlockwise. Turning right does nothing. Come back near
+// neutral before the next twist counts.
+const TWIST_SIGN = 1; // set to -1 if turning LEFT doesn't trigger (and right does)
 const TWIST_SMOOTHING = 0.5; // EMA alpha for the knuckle-line angle (1 = no smoothing)
-const TWIST_TRIGGER_DEG = 15; // turn this far while in the bolt pose to rotate once
+const TWIST_TRIGGER_DEG = 10; // turn this far left of neutral to rotate once
+const TWIST_REARM_DEG = 4; // come back within this of neutral to allow the next twist
+const NEUTRAL_DRIFT = 0.02; // inside the re-arm zone, neutral moves 2%/frame toward the hand
 
 // --- Action hand: pinch backup mode (T key) ---
 const PINCH_ON = 0.45; // thumb tip within this of index tip (↻) or middle tip (↺)
@@ -90,11 +89,11 @@ let column = null; // board column the palm is over (null = hand not seen)
 let fist = false; // soft drop currently on because of a fist
 
 // Action-hand gesture state.
-let twistMode = true; // T key toggles: true = bolt twist, false = pinch
+let twistMode = true; // T key toggles: true = wrist twist, false = pinch
 let twistAngle = null; // smoothed knuckle-line angle in degrees (null = hand not seen)
-let neutralAngle = null; // the angle when the bolt pose started (or after the last rotation)
-let twistDelta = 0; // current angle relative to neutral
-let boltGrip = false; // true while holding the bolt pose (twisting counts)
+let neutralAngle = null; // the hand's "resting" angle
+let twistDelta = 0; // current angle relative to neutral (negative = turned left)
+let twistArmed = true; // false after a twist, until the hand comes back to neutral
 let pinchCW = false; // thumb+index currently pinched (pinch mode)
 let pinchCCW = false; // thumb+middle currently pinched (pinch mode)
 let pinchIndexGap = 0; // latest pinch distances (shown in the status / debug)
@@ -179,7 +178,7 @@ export function toggleDebug() {
 export function toggleTwistMode() {
   twistMode = !twistMode;
   pinchCW = pinchCCW = false;
-  boltGrip = false;
+  twistArmed = true;
 }
 
 // ---------- Per-frame update (called from the game loop) ----------
@@ -278,7 +277,7 @@ function updateActionHand(now) {
     // Forget everything so the next time the hand appears it starts fresh.
     twistAngle = neutralAngle = null;
     twistDelta = 0;
-    boltGrip = false;
+    twistArmed = true;
     pinchCW = pinchCCW = false;
     palmHistory = [];
     swipeSide = handMotion = 0;
@@ -353,7 +352,7 @@ function updateSwipe(hand, now, cooling) {
   }
 }
 
-// ---------- Action hand: bolt twist = rotate ----------
+// ---------- Action hand: wrist twist = rotate anticlockwise ----------
 // Wrap an angle difference into -180..180 so 179° → -179° isn't a 358° jump.
 function wrapDeg(a) {
   return ((((a + 180) % 360) + 360) % 360) - 180;
@@ -364,30 +363,32 @@ function updateTwist(hand, suppressed) {
   const a = hand.pts[5];
   const b = hand.pts[17];
   const raw = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
-  twistAngle = twistAngle === null ? raw : twistAngle + TWIST_SMOOTHING * wrapDeg(raw - twistAngle);
-
-  // The bolt pose works like a clutch: twisting only counts while you hold it.
-  if (!boltGrip && boltPose(hand, 0)) {
-    boltGrip = true;
-    neutralAngle = twistAngle; // the dial starts at zero when you take the pose
-  } else if (boltGrip && !boltPose(hand, POSE_SLACK)) {
-    boltGrip = false; // pose dropped: the hand can return to normal freely
+  if (twistAngle === null) {
+    // Hand just appeared: its current angle becomes neutral.
+    twistAngle = raw;
+    neutralAngle = raw;
+  } else {
+    twistAngle += TWIST_SMOOTHING * wrapDeg(raw - twistAngle);
   }
 
-  if (!boltGrip || suppressed) {
-    // Not gripping (or mid-swish): keep the dial at zero.
+  if (suppressed) {
+    // Mid-swish: keep neutral glued to the hand so the swish can't rotate.
     neutralAngle = twistAngle;
     twistDelta = 0;
+    twistArmed = true;
     return;
   }
 
+  // On screen, a negative angle change = the hand turned anticlockwise (left).
   twistDelta = wrapDeg(twistAngle - neutralAngle) * TWIST_SIGN;
-  if (twistDelta >= TWIST_TRIGGER_DEG) {
-    game.rotate(1); // clockwise
-    neutralAngle = twistAngle; // ratchet: twist another step to rotate again
-  } else if (twistDelta <= -TWIST_TRIGGER_DEG) {
-    game.rotate(-1); // anticlockwise
-    neutralAngle = twistAngle;
+
+  if (Math.abs(twistDelta) <= TWIST_REARM_DEG) {
+    // Resting near neutral: re-arm, and let neutral slowly follow the hand.
+    twistArmed = true;
+    neutralAngle += NEUTRAL_DRIFT * wrapDeg(twistAngle - neutralAngle);
+  } else if (twistArmed && twistDelta <= -TWIST_TRIGGER_DEG) {
+    twistArmed = false;
+    game.rotate(-1); // 90° anticlockwise (turning right is ignored)
   }
 }
 
@@ -413,14 +414,10 @@ function updatePinch(hand, suppressed) {
 }
 
 // ---------- Finger poses ----------
-// slack = 0 to enter a pose; POSE_SLACK to stay in it (so it doesn't flicker).
-function twoFingersOut(hand, slack = 0) {
+// Index + middle out, ring + pinky curled (thumb doesn't matter).
+function twoFingersOut(hand) {
   const f = hand.fingers;
-  return Math.min(f.index, f.middle) > FINGER_OUT - slack && Math.max(f.ring, f.pinky) < FINGER_IN + slack;
-}
-
-function boltPose(hand, slack = 0) {
-  return twoFingersOut(hand, slack) && hand.fingers.thumb > THUMB_OUT - slack;
+  return Math.min(f.index, f.middle) > FINGER_OUT && Math.max(f.ring, f.pinky) < FINGER_IN;
 }
 
 // ---------- Helper measures ----------
@@ -444,7 +441,6 @@ function measureHand(landmarks) {
     middle: ext(12),
     ring: ext(16),
     pinky: ext(20),
-    thumb: dist(pts[4], pts[5]) / palm, // thumb tip → index knuckle
   };
   const curl = (fingers.index + fingers.middle + fingers.ring + fingers.pinky) / 4;
 
@@ -494,9 +490,9 @@ function drawOverlay() {
   }
 }
 
-// Small dial in the action hand's bottom corner. "Up" is zero, the pink
-// ticks are the ±15° triggers, the needle is the current twist, and the
-// dial fills green while you hold the bolt pose.
+// Small dial in the action hand's bottom corner. "Up" is neutral, the
+// green wedge is the re-arm zone, the pink tick on the left is the
+// anticlockwise trigger, and the needle is the hand's current twist.
 function drawDial() {
   const r = 26;
   const cx = swapped ? r + 10 : overlay.width - r - 10;
@@ -521,12 +517,13 @@ function drawDial() {
     return;
   }
 
-  if (boltGrip) {
-    octx.fillStyle = 'rgba(0, 255, 163, 0.25)';
-    octx.beginPath();
-    octx.arc(cx, cy, r, 0, Math.PI * 2);
-    octx.fill();
-  }
+  // Re-arm zone.
+  octx.fillStyle = 'rgba(0, 255, 163, 0.3)';
+  octx.beginPath();
+  octx.moveTo(cx, cy);
+  octx.arc(cx, cy, r, rad(-TWIST_REARM_DEG), rad(TWIST_REARM_DEG));
+  octx.closePath();
+  octx.fill();
 
   // Dial ring.
   octx.strokeStyle = 'rgba(255, 43, 214, 0.5)';
@@ -535,21 +532,19 @@ function drawDial() {
   octx.arc(cx, cy, r, 0, Math.PI * 2);
   octx.stroke();
 
-  // Trigger marks.
+  // Trigger mark (anticlockwise only, so just the left side).
   octx.strokeStyle = ACTION_COLOR;
   octx.lineWidth = 3;
-  for (const deg of [-TWIST_TRIGGER_DEG, TWIST_TRIGGER_DEG]) {
-    const a = rad(deg);
-    octx.beginPath();
-    octx.moveTo(cx + Math.cos(a) * (r - 7), cy + Math.sin(a) * (r - 7));
-    octx.lineTo(cx + Math.cos(a) * (r + 3), cy + Math.sin(a) * (r + 3));
-    octx.stroke();
-  }
+  const t = rad(-TWIST_TRIGGER_DEG);
+  octx.beginPath();
+  octx.moveTo(cx + Math.cos(t) * (r - 7), cy + Math.sin(t) * (r - 7));
+  octx.lineTo(cx + Math.cos(t) * (r + 3), cy + Math.sin(t) * (r + 3));
+  octx.stroke();
 
-  // Needle (grey until you take the bolt pose, hidden when no action hand).
+  // Needle (grey while waiting to re-arm, hidden when no action hand).
   if (twistAngle !== null) {
     const a = rad(Math.max(-90, Math.min(90, twistDelta)));
-    octx.strokeStyle = boltGrip ? '#ffffff' : '#7a7f99';
+    octx.strokeStyle = twistArmed ? '#ffffff' : '#7a7f99';
     octx.lineWidth = 2;
     octx.beginPath();
     octx.moveTo(cx, cy);
@@ -558,7 +553,7 @@ function drawDial() {
   }
 
   octx.fillStyle = ACTION_COLOR;
-  octx.fillText('TWIST', cx, cy + r - 4);
+  octx.fillText('TWIST ↺', cx, cy + r - 4);
   octx.restore();
 }
 
@@ -623,7 +618,7 @@ function updateStatus() {
     `<div class="${cls}">${name} (${side}): ${hand ? 'TRACKING · curl ' + hand.curl.toFixed(2) + extra : 'not seen'}</div>`;
   const moveExtra = column === null ? '' : ` · COL ${column + 1}${fist ? ' · FIST' : ''}`;
   let actionExtra = twistMode
-    ? ` · TWIST ${twistDelta >= 0 ? '+' : ''}${Math.round(twistDelta)}°${boltGrip ? ' (GRIP)' : ''}`
+    ? ` · TWIST ${twistDelta >= 0 ? '+' : ''}${Math.round(twistDelta)}°${twistArmed ? '' : ' (re-arm)'}`
     : ` · PINCH ${pinchIndexGap.toFixed(2)}/${pinchMiddleGap.toFixed(2)}`;
   const now = performance.now();
   const motionNote = isCoolingDown(now) ? ' · COOLDOWN' : handMotion > FAST_MOVE_DISTANCE ? ' · MOVING' : '';
@@ -631,7 +626,7 @@ function updateStatus() {
   statusEl.innerHTML =
     line('MOVE', moveSide, moveHand, 'move', moveExtra) +
     line('ACTION', actionSide, actionHand, 'action', actionExtra) +
-    `<div class="mode">ROTATE MODE: ${twistMode ? 'BOLT TWIST' : 'PINCH'} (T to switch)</div>`;
+    `<div class="mode">ROTATE MODE: ${twistMode ? 'TWIST ↺' : 'PINCH'} (T to switch)</div>`;
 
   if (debugOn) renderDebug(now);
 }
@@ -653,8 +648,7 @@ function renderDebug(now) {
     ['— ACTION HAND', '', '', false],
     ['idx+mid out', f ? n(Math.min(f.index, f.middle)) : '—', `>${FINGER_OUT}`, f && Math.min(f.index, f.middle) > FINGER_OUT],
     ['ring+pinky in', f ? n(Math.max(f.ring, f.pinky)) : '—', `<${FINGER_IN}`, f && Math.max(f.ring, f.pinky) < FINGER_IN],
-    ['thumb out', f ? n(f.thumb) : '—', `>${THUMB_OUT}`, f && f.thumb > THUMB_OUT],
-    ['twist °', twistMode && ac ? n(twistDelta, 0) : '—', `±${TWIST_TRIGGER_DEG} in bolt pose`, boltGrip],
+    ['twist °', twistMode && ac ? n(twistDelta, 0) : '—', `≤-${TWIST_TRIGGER_DEG} fire · ±${TWIST_REARM_DEG} re-arm`, twistMode && !twistArmed],
     ['pinch idx', !twistMode && ac ? n(pinchIndexGap) : '—', `on <${PINCH_ON} · off >${PINCH_OFF}`, pinchCW],
     ['pinch mid', !twistMode && ac ? n(pinchMiddleGap) : '—', `on <${PINCH_ON} · off >${PINCH_OFF}`, pinchCCW],
     ['swish side', ac ? n(swipeSide) : '—', `≥${SWIPE_DISTANCE} in ${GESTURE_WINDOW_MS}ms`, ac && twoFingersOut(ac)],
