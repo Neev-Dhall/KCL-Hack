@@ -11,6 +11,15 @@ const SINGLE_HAND_MIDLINE = 0.5; // one hand visible: left of this (mirrored) = 
 // Reference values for curl (avg fingertip→wrist distance):
 //   open hand ≈ 1.9, closed fist ≈ 0.9
 
+// --- Move hand: columns ---
+const COLUMN_AREA_START = 0.05; // bands start 5% across the mirrored frame…
+const COLUMN_AREA_END = 0.47; // …and end at 47% (mirrored to 53–95% when swapped)
+const COLUMN_HYSTERESIS = 0.2; // palm must go 0.2 of a column past a boundary to switch
+
+// --- Move hand: fist = soft drop ---
+const FIST_ON_CURL = 1.05; // curl below this → soft drop on
+const FIST_OFF_CURL = 1.4; // curl above this → soft drop off
+
 // ---------- MediaPipe setup ----------
 const MEDIAPIPE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const WASM_URL = MEDIAPIPE_URL + '/wasm';
@@ -40,6 +49,10 @@ let aspect = 4 / 3; // video width / height, for aspect-correct distances
 // Latest per-role hand data (null when not visible).
 let moveHand = null;
 let actionHand = null;
+
+// Move-hand gesture state.
+let column = null; // board column the palm is over (null = hand not seen)
+let fist = false; // soft drop currently on because of a fist
 
 // ---------- Setup ----------
 export async function initHands() {
@@ -104,6 +117,7 @@ export function updateHands() {
 
   const result = landmarker.detectForVideo(video, performance.now());
   assignRoles(result.landmarks || []);
+  updateMoveHand();
 
   drawOverlay();
   updateStatus();
@@ -127,6 +141,50 @@ function assignRoles(hands) {
 
   moveHand = swapped ? right : left;
   actionHand = swapped ? left : right;
+}
+
+// ---------- Move hand: column + soft drop ----------
+// Where the column bands sit on the mirrored frame (0..1).
+function columnArea() {
+  if (!swapped) return { start: COLUMN_AREA_START, end: COLUMN_AREA_END };
+  return { start: 1 - COLUMN_AREA_END, end: 1 - COLUMN_AREA_START };
+}
+
+function updateMoveHand() {
+  if (!moveHand) {
+    column = null;
+    if (fist) {
+      fist = false;
+      game.setSoftDrop(false);
+    }
+    return;
+  }
+
+  // Palm position measured in columns, e.g. 3.6 = 60% of the way across band 3.
+  const { start, end } = columnArea();
+  const bandWidth = (end - start) / game.COLS;
+  const pos = (moveHand.screenX - start) / bandWidth;
+  const clamp = (c) => Math.max(0, Math.min(game.COLS - 1, c));
+
+  // Hysteresis: only switch once the palm is well past the current band's edge.
+  const outsideCurrent =
+    column === null || pos < column - COLUMN_HYSTERESIS || pos > column + 1 + COLUMN_HYSTERESIS;
+  if (outsideCurrent) {
+    const newColumn = clamp(Math.floor(pos));
+    if (newColumn !== column) {
+      column = newColumn;
+      game.moveTo(column); // only on change, so the arrow keys can still nudge
+    }
+  }
+
+  // Fist = soft drop (two thresholds so it doesn't flicker).
+  if (!fist && moveHand.curl < FIST_ON_CURL) {
+    fist = true;
+    game.setSoftDrop(true);
+  } else if (fist && moveHand.curl > FIST_OFF_CURL) {
+    fist = false;
+    game.setSoftDrop(false);
+  }
 }
 
 // ---------- Helper measures ----------
@@ -172,8 +230,34 @@ function drawOverlay() {
   octx.stroke();
   octx.setLineDash([]);
 
+  drawColumnBands();
+
   if (moveHand) drawSkeleton(moveHand, MOVE_COLOR);
   if (actionHand) drawSkeleton(actionHand, ACTION_COLOR);
+}
+
+// 10 numbered bands across the move hand's area; the palm's band lights up.
+function drawColumnBands() {
+  const w = overlay.width;
+  const h = overlay.height;
+  const { start, end } = columnArea();
+  const bandW = ((end - start) * w) / game.COLS;
+
+  octx.save();
+  octx.font = '7px "Press Start 2P", monospace';
+  octx.textAlign = 'center';
+  for (let c = 0; c < game.COLS; c++) {
+    const x = start * w + c * bandW;
+    if (c === column) {
+      octx.fillStyle = fist ? 'rgba(255, 230, 0, 0.3)' : 'rgba(0, 229, 255, 0.25)';
+      octx.fillRect(x, 0, bandW, h);
+    }
+    octx.strokeStyle = 'rgba(0, 229, 255, 0.3)';
+    octx.strokeRect(x + 0.5, 0.5, bandW, h - 1);
+    octx.fillStyle = c === column ? '#ffffff' : 'rgba(0, 229, 255, 0.7)';
+    octx.fillText(String(c + 1), x + bandW / 2, 12);
+  }
+  octx.restore();
 }
 
 function drawSkeleton(hand, color) {
@@ -209,10 +293,11 @@ function drawSkeleton(hand, color) {
 function updateStatus() {
   const moveSide = swapped ? 'R' : 'L';
   const actionSide = swapped ? 'L' : 'R';
-  const line = (name, side, hand, cls) =>
-    `<div class="${cls}">${name} (${side}): ${hand ? 'TRACKING · curl ' + hand.curl.toFixed(2) : 'not seen'}</div>`;
+  const line = (name, side, hand, cls, extra) =>
+    `<div class="${cls}">${name} (${side}): ${hand ? 'TRACKING · curl ' + hand.curl.toFixed(2) + extra : 'not seen'}</div>`;
+  const moveExtra = column === null ? '' : ` · COL ${column + 1}${fist ? ' · FIST' : ''}`;
   statusEl.innerHTML =
-    line('MOVE', moveSide, moveHand, 'move') + line('ACTION', actionSide, actionHand, 'action');
+    line('MOVE', moveSide, moveHand, 'move', moveExtra) + line('ACTION', actionSide, actionHand, 'action', '');
 }
 
 function setStatus(text) {

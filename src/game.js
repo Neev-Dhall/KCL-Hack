@@ -153,11 +153,11 @@ function rotateMatrix(matrix, dir) {
   );
 }
 
-// The board column under the middle of the piece's filled cells.
-function centreColumn() {
+// Leftmost and rightmost filled column inside the piece's matrix.
+function filledRange(matrix) {
   let min = Infinity;
   let max = -Infinity;
-  piece.matrix.forEach((row) =>
+  matrix.forEach((row) =>
     row.forEach((v, c) => {
       if (v) {
         min = Math.min(min, c);
@@ -165,7 +165,24 @@ function centreColumn() {
       }
     })
   );
+  return { min, max };
+}
+
+// The board column under the middle of the piece's filled cells.
+function centreColumn() {
+  const { min, max } = filledRange(piece.matrix);
   return piece.x + Math.floor((min + max) / 2);
+}
+
+// The board columns the piece will cover once it reaches targetColumn
+// (pushed back inside the walls if the piece is too wide to centre there).
+function targetColumns() {
+  const { min, max } = filledRange(piece.matrix);
+  let x = targetColumn - Math.floor((min + max) / 2);
+  x = Math.max(-min, Math.min(COLS - 1 - max, x));
+  const cols = [];
+  for (let c = min; c <= max; c++) cols.push(x + c);
+  return cols;
 }
 
 function ghostY() {
@@ -328,6 +345,8 @@ function drawBoard() {
   for (let c = 1; c < COLS; c++) line(c * CELL + 0.5, 0, c * CELL + 0.5, BOARD_H);
   for (let r = 1; r < ROWS; r++) line(0, r * CELL + 0.5, BOARD_W, r * CELL + 0.5);
 
+  drawTarget();
+
   // Locked blocks.
   board.forEach((row, r) =>
     row.forEach((type, c) => {
@@ -364,6 +383,27 @@ function drawBoard() {
 
   drawFlash();
   drawOverlay();
+}
+
+// Light tint on the columns the piece is heading to, plus a marker
+// at the top of the chosen column (set by moveTo / the move hand).
+function drawTarget() {
+  if (targetColumn === null || !piece || status !== 'playing') return;
+  ctx.fillStyle = 'rgba(0, 229, 255, 0.07)';
+  for (const c of targetColumns()) ctx.fillRect(c * CELL, 0, CELL, BOARD_H);
+
+  const cx = targetColumn * CELL + CELL / 2;
+  ctx.save();
+  ctx.fillStyle = '#00e5ff';
+  ctx.shadowColor = '#00e5ff';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(cx - 7, 3);
+  ctx.lineTo(cx + 7, 3);
+  ctx.lineTo(cx, 12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawFlash() {
