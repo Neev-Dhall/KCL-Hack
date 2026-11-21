@@ -16,9 +16,7 @@
 
 <img src="docs/media/hands-demo.gif" alt="A player controlling Hand Stack with both hands: cyan skeleton on the left hand picks the column band, pink skeleton on the right hand acts" width="720">
 
-*Real hand-tracking gameplay: the left hand (cyan) picks the column, the right hand (pink) rotates, holds and slams.*
-
-[▶ Watch the full hand-tracking clip (40 s)](docs/media/human_game.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [Bonus: Hand Glide](#-bonus-game-hand-glide) · [How it works](#-how-it-works)
+[▶ Watch the full gameplay clip (42 s)](docs/media/human_game.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [How it works](#-how-it-works)
 
 </div>
 
