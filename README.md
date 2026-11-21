@@ -14,9 +14,11 @@
 
 **Retro Remix track · KCL Tech First Year Hack · built with JetBrains Air**
 
-<img src="docs/media/demo.gif" alt="Hand Stack gameplay: pieces fall, line clears flash SINGLE, hold and next previews update" width="720">
+<img src="docs/media/hands-demo.gif" alt="A player controlling Hand Stack with both hands: cyan skeleton on the left hand picks the column band, pink skeleton on the right hand acts" width="720">
 
-[▶ Watch the full gameplay clip (42 s)](docs/media/gameplay.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [Bonus: Hand Glide](#-bonus-game-hand-glide) · [How it works](#-how-it-works)
+*Real hand-tracking gameplay: the left hand (cyan) picks the column, the right hand (pink) rotates, holds and slams.*
+
+[▶ Watch the full hand-tracking clip (40 s)](docs/media/human_game.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [Bonus: Hand Glide](#-bonus-game-hand-glide) · [How it works](#-how-it-works)
 
 </div>
 
@@ -55,14 +57,11 @@ Hand tracking runs **entirely in the browser** with Google's MediaPipe. Nothing 
 |---|
 | <img src="docs/media/debug-panel.png" alt="Debug panel listing every live gesture value next to its threshold, and the tracker running on GPU at 47 fps"> |
 
-> **About these captures:** the screenshots and the gameplay clip were recorded in headless Chrome. The game was driven by scripted **keyboard** input, and the camera was a blank synthetic feed. That's why the camera panel shows the bands and dial but no hands, and why the status lines read "not seen".
->
-> <!-- TEAM: to add a real hand-tracking clip, open this README on GitHub, click edit, drag an .mp4 into the editor
->      (GitHub uploads it and inserts a playable link), and paste that link under "Hand tracking in action" below. -->
+| Keyboard demo (scripted, 11 s) |
+|---|
+| <img src="docs/media/demo.gif" alt="Hand Stack keyboard gameplay: pieces fall, line clears flash SINGLE, hold and next previews update" width="720"> |
 
-### Hand tracking in action
-
-*Clip coming soon: recorded on a real webcam during the hackathon.*
+> **About these captures:** the screenshots above, the keyboard demo and its [full 42 s clip](docs/media/gameplay.mp4) were recorded in headless Chrome. The game was driven by scripted **keyboard** input, and the camera was a blank synthetic feed. That's why their camera panels show no hands. The GIF at the top and the [hand-tracking clip](docs/media/human_game.mp4) are real webcam play.
 
 ---
 
