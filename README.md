@@ -16,7 +16,7 @@
 
 <img src="docs/media/demo.gif" alt="Hand Stack gameplay: pieces fall, line clears flash SINGLE, hold and next previews update" width="720">
 
-[▶ Watch the full gameplay clip (42 s)](docs/media/gameplay.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [How it works](#-how-it-works)
+[▶ Watch the full gameplay clip (42 s)](docs/media/human_game.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [How it works](#-how-it-works)
 
 </div>
 
@@ -54,18 +54,7 @@ Hand tracking runs **entirely in the browser** with Google's MediaPipe. Nothing 
 | Debug panel (press D) |
 |---|
 | <img src="docs/media/debug-panel.png" alt="Debug panel listing every live gesture value next to its threshold, and the tracker running on GPU at 47 fps"> |
-
-> **About these captures:** the screenshots and the gameplay clip were recorded in headless Chrome. The game was driven by scripted **keyboard** input, and the camera was a blank synthetic feed. That's why the camera panel shows the bands and dial but no hands, and why the status lines read "not seen".
->
-> <!-- TEAM: to add a real hand-tracking clip, open this README on GitHub, click edit, drag an .mp4 into the editor
->      (GitHub uploads it and inserts a playable link), and paste that link under "Hand tracking in action" below. -->
-
-### Hand tracking in action
-
-*Clip coming soon: recorded on a real webcam during the hackathon.*
-
----
-
+f
 ## 🚀 Quick start
 
 You need [Node.js](https://nodejs.org/) 20+, a webcam and an internet connection. The hand-tracking model loads from a CDN.
