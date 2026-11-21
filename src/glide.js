@@ -361,7 +361,7 @@ function renderDebug() {
     ['TRACKER', `${fps} fps · ${latestHands.length} hand(s)`, '', false],
     ['mode', mode.toUpperCase(), 'T to switch', false],
     ['left curl', n(sides.left.curl), `<${FIST_CURL} · >${OPEN_CURL}`, sides.left.armed],
-    ['right curl', n(sides.right.curl), `fist <${FIST_CURL} · re-open >${OPEN_CURL}`, sides.right.armed],
+    ['right curl', n(sides.right.curl), `<${FIST_CURL} · >${OPEN_CURL}`, sides.right.armed],
     ['palm height', n(steerPalmY), `${STEER_TOP} top → ${STEER_BOTTOM} floor`, isSteering()],
     ['comet y', n(y, 0), `0 → ${FLOOR_Y}`, false],
   ];
