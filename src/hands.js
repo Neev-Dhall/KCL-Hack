@@ -626,7 +626,7 @@ function renderDebug(now) {
   const cooldownLeft = Math.max(0, cooldownUntil - now);
 
   const rows = [
-    ['TRACKER', `${delegateUsed} · ${fps} fps`, '', false],
+    ['TRACKER', `${delegateUsed} · ${fps} fps`, vision ? `${vision.detectMs.toFixed(0)} ms detect · ${vision.latencyMs.toFixed(0)} ms delay` : '', false],
     ['— MOVE HAND', '', '', false],
     ['column pos', mv ? n(columnPos) : '—', `±${COLUMN_HYSTERESIS} past edge`, false],
     ['curl (fist)', mv ? n(mv.curl) : '—', `on <${FIST_ON_CURL} · off >${FIST_OFF_CURL}`, fist],

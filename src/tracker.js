@@ -67,6 +67,12 @@ export function enablePose() {
   return posePromise;
 }
 
+// Timing for the debug panels: detection time in the worker, and the full
+// camera-frame → result delay, both in ms.
+export function trackerStats() {
+  return vision ? { detectMs: vision.detectMs, latencyMs: vision.latencyMs } : null;
+}
+
 export function isPoseReady() {
   return !!vision && vision.isReady('pose');
 }

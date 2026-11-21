@@ -4,7 +4,7 @@
 // Golden moles are worth extra; bombs cost you time. 60-second rounds.
 // Keyboard: 1–9 (or the numpad) whack a hole; click works too.
 import './style.css';
-import { startTracker, detectHands, drawSkeleton } from './tracker.js';
+import { startTracker, detectHands, drawSkeleton, trackerStats } from './tracker.js';
 import { unlockAudio, toggleMute, playEvent, startMusic, stopMusic } from './sound.js';
 import { createHandMenu } from './handmenu.js';
 
@@ -413,7 +413,7 @@ function renderDebug() {
   const info = (s) =>
     s.value === null ? '—' : s.armed ? `drop ${(s.high - s.value).toFixed(2)} / ${SQUEEZE_DROP}` : `rise ${(s.value - s.low).toFixed(2)} / ${REOPEN_RISE}`;
   const rows = [
-    ['TRACKER', `hands · ${fps} fps · ${latestHands.length} seen`, '', false],
+    ['TRACKER', `hands · ${fps} fps · ${latestHands.length} seen`, trackerStats() ? `${trackerStats().detectMs.toFixed(0)} ms detect · ${trackerStats().latencyMs.toFixed(0)} ms delay` : '', false],
     ['left curl', n(hammers[0].curl), info(hammers[0].squeeze), hammers[0].squeeze.armed],
     ['left aim', hammerLive(hammers[0]) ? `hole ${hammers[0].hole + 1}` : '—', '1–9', false],
     ['right curl', n(hammers[1].curl), info(hammers[1].squeeze), hammers[1].squeeze.armed],

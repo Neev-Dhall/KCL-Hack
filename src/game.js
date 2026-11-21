@@ -13,7 +13,7 @@ const PANEL_W = 160;
 export const CANVAS_W = PANEL_X + PANEL_W; // 480
 export const CANVAS_H = BOARD_H; // 600
 
-const SLIDE_MS = 40; // moveTo(): one column every 40 ms
+const SLIDE_MS = 15; // moveTo(): one column every 15 ms (quick, so hand moves feel instant)
 const SOFT_DROP_MS = 40; // gravity interval while soft dropping
 const FLASH_MS = 700; // how long on-board text flashes last
 const KICKS = [0, -1, 1, -2, 2]; // wall-kick x offsets tried when rotating

@@ -5,7 +5,7 @@
 //   STEER   — the comet follows your palm's height; lose your hand and gravity takes over
 // Space / ↑ / click always flap too.
 import './style.css';
-import { startTracker, detectHands, drawSkeleton, enablePose, isPoseReady, detectPose, drawArms } from './tracker.js';
+import { startTracker, detectHands, drawSkeleton, enablePose, isPoseReady, detectPose, drawArms, trackerStats } from './tracker.js';
 import { unlockAudio, toggleMute, playEvent, startMusic, stopMusic } from './sound.js';
 import { createHandMenu } from './handmenu.js';
 
@@ -37,7 +37,7 @@ const SHAKE_MS = 350; // screen shake after a crash
 // WINGS mode: arm height = how far your wrists are above your shoulders, in
 // shoulder-widths (so it works at any distance). A flap is a DOWNSTROKE: arm
 // height dropping from its recent high; raising your arms again re-arms it.
-const WING_DROP = 0.6; // arms fall this far (shoulder-widths) below their recent high → flap
+const WING_DROP = 0.45; // arms fall this far (shoulder-widths) below their recent high → flap
 const WING_RISE = 0.3; // arms rise this far above their recent low → ready again
 const POSE_VISIBLE = 0.5; // a shoulder / wrist counts as seen above this visibility
 
@@ -488,14 +488,14 @@ function renderDebug() {
   const rows =
     mode === 'wings'
       ? [
-          ['TRACKER', `pose · ${fps} fps`, '', false],
+          ['TRACKER', `pose · ${fps} fps`, trackerStats() ? `${trackerStats().detectMs.toFixed(0)} ms detect · ${trackerStats().latencyMs.toFixed(0)} ms delay` : '', false],
           ['mode', 'WINGS', 'T to switch', false],
           ['arms height', n(armsHeight), 'above shoulders (widths)', armsHeight !== null],
           ['downstroke', armsHeight === null ? '—' : wing.armed ? 'READY' : 'raise arms', dropInfo(wing, WING_DROP, WING_RISE), wing.armed],
           ['comet y', n(y, 0), `0 → ${FLOOR_Y}`, false],
         ]
       : [
-          ['TRACKER', `hands · ${fps} fps · ${latestHands.length} seen`, '', false],
+          ['TRACKER', `hands · ${fps} fps · ${latestHands.length} seen`, trackerStats() ? `${trackerStats().detectMs.toFixed(0)} ms detect · ${trackerStats().latencyMs.toFixed(0)} ms delay` : '', false],
           ['mode', mode.toUpperCase(), 'T to switch', false],
           ['left curl', n(sides.left.value), dropInfo(sides.left, SQUEEZE_DROP, REOPEN_RISE), sides.left.armed],
           ['right curl', n(sides.right.value), dropInfo(sides.right, SQUEEZE_DROP, REOPEN_RISE), sides.right.armed],
