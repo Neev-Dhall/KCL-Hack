@@ -16,6 +16,8 @@
 
 <img src="docs/media/arcade-lobby.gif" alt="The Hand Arcade lobby: three neon cabinets (Hand Stack, Hand Glide, Hand Whack) with live attract-mode screens; one is chosen and the view zooms into it" width="800">
 
+**[▶ Play it now: neev-dhall.github.io/KCL-Hack](https://neev-dhall.github.io/KCL-Hack/)** (Chrome, allow the camera)
+
 [Quick start](#-quick-start) · [The arcade](#-the-arcade) · [🧱 Hand Stack](#-hand-stack) · [🌠 Hand Glide](#-hand-glide) · [🔨 Hand Whack](#-hand-whack) · [How it works](#-how-it-works)
 
 </div>
