@@ -117,7 +117,7 @@ export async function initHands() {
   try {
     setStatus('Starting camera…');
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480, facingMode: 'user' },
+      video: { width: 640, height: 480, frameRate: { ideal: 60 }, facingMode: 'user' }, // more fps = less delay
       audio: false,
     });
     video.srcObject = stream;

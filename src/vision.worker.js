@@ -83,8 +83,10 @@ self.onmessage = ({ data: msg }) => {
   } else if (msg.type === 'frame') {
     const { model, bitmap, ts } = msg;
     try {
+      const t0 = performance.now();
       const result = landmarkers[model].detectForVideo(bitmap, ts);
-      self.postMessage({ type: 'result', model, landmarks: result.landmarks || [] });
+      const detectMs = performance.now() - t0;
+      self.postMessage({ type: 'result', model, landmarks: result.landmarks || [], detectMs });
     } catch (err) {
       self.postMessage({ type: 'frame-failed', model, error: String(err) });
     } finally {

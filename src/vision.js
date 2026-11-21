@@ -18,6 +18,9 @@ export class Vision {
     this.waiters = {}; // model → { resolve, reject }
     this.ready = {}; // model → true once loaded
     this.results = {}; // model → newest unread landmarks
+    this.detectMs = 0; // how long the last detection took in the worker
+    this.latencyMs = 0; // camera frame grabbed → result back on the page
+    this.sentAt = 0;
   }
 
   // Loads a model ('hand' or 'pose') in the worker. Resolves with 'GPU' or 'CPU'.
@@ -50,8 +53,21 @@ export class Vision {
     if (this.busy || !this.ready[model] || v.readyState < 2 || v.currentTime === this.lastVideoTime) return;
     this.busy = true;
     this.lastVideoTime = v.currentTime;
+    this.sentAt = performance.now();
+    const send = (frame) => this.worker.postMessage({ type: 'frame', model, bitmap: frame, ts: performance.now() }, [frame]);
+
+    // A VideoFrame hands the camera image over without copying it (fast);
+    // createImageBitmap makes a copy, and is the fallback for older browsers.
+    if (typeof VideoFrame !== 'undefined') {
+      try {
+        send(new VideoFrame(v));
+        return;
+      } catch {
+        /* fall through to the copy */
+      }
+    }
     createImageBitmap(v)
-      .then((bitmap) => this.worker.postMessage({ type: 'frame', model, bitmap, ts: performance.now() }, [bitmap]))
+      .then(send)
       .catch((err) => {
         this.busy = false;
         console.warn('Could not grab camera frame:', err);
@@ -68,6 +84,8 @@ export class Vision {
     } else if (msg.type === 'result') {
       this.busy = false;
       this.results[msg.model] = msg.landmarks;
+      this.detectMs = msg.detectMs;
+      this.latencyMs = performance.now() - this.sentAt;
     } else if (msg.type === 'frame-failed') {
       this.busy = false;
       console.warn('Tracking frame failed:', msg.error);

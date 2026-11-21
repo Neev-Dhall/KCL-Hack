@@ -29,7 +29,7 @@ export async function startTracker(videoEl, onStatus) {
   try {
     onStatus('camera');
     video.srcObject = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480, facingMode: 'user' },
+      video: { width: 640, height: 480, frameRate: { ideal: 60 }, facingMode: 'user' }, // more fps = less delay
       audio: false,
     });
     await video.play();
