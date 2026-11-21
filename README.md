@@ -16,6 +16,7 @@ Left hand = **MOVE** hand (cyan). Right hand = **ACTION** hand (pink). Press **S
 |---|---|---|
 | Left | Palm over one of the 10 column bands on the camera view | Piece slides to that column |
 | Left | Hold a closed fist | Soft drop |
+| Left | Tap thumb and index together | Rotate 90° clockwise |
 | Right | Palm facing camera, turn it left like a dial, then back to centre | Rotate 90° anticlockwise |
 | Right | Tap thumb and index together | Hold the piece |
 | Right | Close into a fist | Hard drop ("slam"); also starts the game |
@@ -33,7 +34,7 @@ Left hand = **MOVE** hand (cyan). Right hand = **ACTION** hand (pink). Press **S
 | Enter | Start / restart |
 | S | Swap hand roles (left-handed mode) |
 | D | Debug panel (live gesture values vs thresholds) |
-| M | Mute / unmute |
+| M | Mute / unmute (sound effects and music) |
 
 ## Running it
 
@@ -46,7 +47,7 @@ npm run dev
 
 Then open the URL Vite prints (usually http://localhost:5173) in **Google Chrome** and allow camera access. If the camera is blocked, the game still works with the keyboard.
 
-Sound starts after your first click or key press, because browsers block audio until then.
+Sound and music start after your first click or key press, because browsers block audio until then.
 
 ## How it works
 
@@ -54,7 +55,7 @@ Sound starts after your first click or key press, because browsers block audio u
 |---|---|
 | `src/game.js` | Game rules and drawing only: the board, the 7-bag randomiser, wall kicks, scoring, levels and the neon canvas renderer. It knows nothing about cameras. |
 | `src/hands.js` | Camera, MediaPipe hand tracking and gesture detection. It only talks to the game through the API that `game.js` exports. **Every gesture threshold is in one commented block at the top.** |
-| `src/sound.js` | Small sound effects synthesised with the Web Audio API (no audio files). |
+| `src/sound.js` | Sound effects and an original chiptune music loop, all synthesised with the Web Audio API (no audio files). The music speeds up each level. |
 | `src/main.js` | Wires everything together: keyboard, sound and the game loop. |
 
 ### Gesture tricks

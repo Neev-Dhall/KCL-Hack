@@ -3,9 +3,11 @@
 import './style.css';
 import * as game from './game.js';
 import { initHands, updateHands, swapHands, toggleDebug } from './hands.js';
-import { unlockAudio, toggleMute, playEvent } from './sound.js';
+import { unlockAudio, toggleMute, playEvent, startMusic, stopMusic } from './sound.js';
 
 const guide = document.getElementById('guide');
+const controls = document.getElementById('controls');
+let musicPlaying = false;
 const soundState = document.getElementById('sound-state');
 
 game.init(document.getElementById('game'));
@@ -85,9 +87,21 @@ function loop(now) {
   game.update(dt);
   game.draw();
 
-  // The gesture guide only shows before the first game.
-  const showGuide = game.getState().status === 'start';
+  const { status } = game.getState();
+
+  // The big gesture guide shows before the first game; the compact
+  // controls list shows from then on.
+  const showGuide = status === 'start';
   if (guide.hidden === showGuide) guide.hidden = !showGuide;
+  if (controls.hidden !== showGuide) controls.hidden = showGuide;
+
+  // Music only plays during a game (stops when paused or over).
+  const wantMusic = status === 'playing';
+  if (wantMusic !== musicPlaying) {
+    if (wantMusic) startMusic();
+    else stopMusic();
+    musicPlaying = wantMusic;
+  }
 
   requestAnimationFrame(loop);
 }

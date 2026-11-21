@@ -71,6 +71,15 @@
             <div><b>FIST · SOFT DROP</b>Hold a fist to drop faster.</div>
           </div>
 
+          <div class="gesture move">
+            <svg class="icon" viewBox="0 0 64 48">
+              <use href="#hand-pinch" x="16" y="2" width="32" height="40" />
+              <path d="M8 18 A26 26 0 0 1 56 18" class="arrow" />
+              <path d="M56 18 l-5 -1 M56 18 l1 -5" class="arrow" />
+            </svg>
+            <div><b>PINCH TAP · ROTATE ↻</b>Tap thumb and index<br />on your left hand.</div>
+          </div>
+
           <div class="gesture action">
             <svg class="icon" viewBox="0 0 64 48">
               <use href="#hand-open" x="16" y="4" width="32" height="40" />
@@ -109,6 +118,22 @@
         </div>
         <div id="hand-status">Waiting for camera…</div>
         <div id="debug" hidden>Waiting for the hand tracker…</div>
+
+        <!-- Compact controls reminder shown during play (hidden while debug is open) -->
+        <div id="controls" hidden>
+          <div class="ctl-col move">
+            <b>LEFT HAND</b>
+            <span>PALM ON BAND · MOVE</span>
+            <span>PINCH TAP · ROTATE ↻</span>
+            <span>HOLD FIST · SOFT DROP</span>
+          </div>
+          <div class="ctl-col action">
+            <b>RIGHT HAND</b>
+            <span>TWIST LEFT · ROTATE ↺</span>
+            <span>PINCH TAP · HOLD</span>
+            <span>FIST · SLAM</span>
+          </div>
+        </div>
       </section>
     </main>
 

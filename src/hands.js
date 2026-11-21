@@ -30,8 +30,9 @@ const TWIST_TRIGGER_DEG = 10; // turn this far left of neutral to rotate once
 const TWIST_REARM_DEG = 4; // come back within this of neutral to allow the next twist
 const NEUTRAL_DRIFT = 0.02; // inside the re-arm zone, neutral moves 2%/frame toward the hand
 
-// --- Action hand: thumb + index pinch tap = hold ---
-const PINCH_ON = 0.45; // thumb tip within this of the index tip → pinch → hold
+// --- Thumb + index pinch tap (both hands) ---
+// Left hand pinch = rotate clockwise. Right hand pinch = hold.
+const PINCH_ON = 0.45; // thumb tip within this of the index tip = pinch
 const PINCH_OFF = 0.6; // gap must open above this before the next pinch counts
 const PINKY_OPEN = 1.0; // pinky tip must be this far from the wrist (so a fist isn't a pinch)
 
@@ -80,6 +81,8 @@ let actionHand = null;
 // Move-hand gesture state.
 let column = null; // board column the palm is over (null = hand not seen)
 let fist = false; // soft drop currently on because of a fist
+let movePinched = false; // left thumb + index currently pinched
+let movePinchGap = 0; // latest left thumb-tip → index-tip distance (palm lengths)
 
 // Action-hand gesture state.
 let twistAngle = null; // smoothed knuckle-line angle in degrees (null = hand not seen)
@@ -219,11 +222,21 @@ function columnArea() {
 function updateMoveHand() {
   if (!moveHand) {
     column = null;
+    movePinched = false;
     if (fist) {
       fist = false;
       game.setSoftDrop(false);
     }
     return;
+  }
+
+  // Pinch = rotate clockwise (one rotation per tap).
+  movePinchGap = dist(moveHand.pts[4], moveHand.pts[8]) / moveHand.palm;
+  if (movePinched && movePinchGap > PINCH_OFF) {
+    movePinched = false; // fingers apart again: ready for the next tap
+  } else if (!movePinched && movePinchGap < PINCH_ON && moveHand.fingers.pinky > PINKY_OPEN) {
+    movePinched = true;
+    game.rotate(1);
   }
 
   // Palm position measured in columns, e.g. 3.6 = 60% of the way across band 3.
@@ -234,9 +247,10 @@ function updateMoveHand() {
   const clamp = (c) => Math.max(0, Math.min(game.COLS - 1, c));
 
   // Hysteresis: only switch once the palm is well past the current band's edge.
+  // The column is frozen mid-pinch so the tap can't nudge the piece sideways.
   const outsideCurrent =
     column === null || pos < column - COLUMN_HYSTERESIS || pos > column + 1 + COLUMN_HYSTERESIS;
-  if (outsideCurrent) {
+  if (outsideCurrent && !movePinched) {
     const newColumn = clamp(Math.floor(pos));
     if (newColumn !== column) {
       column = newColumn;
@@ -561,7 +575,10 @@ function updateStatus() {
   const actionSide = swapped ? 'L' : 'R';
   const line = (name, side, hand, cls, extra) =>
     `<div class="${cls}">${name} (${side}): ${hand ? 'TRACKING · curl ' + hand.curl.toFixed(2) + extra : 'not seen'}</div>`;
-  const moveExtra = column === null ? '' : ` · COL ${column + 1}${fist ? ' · FIST' : ''}`;
+  const moveExtra =
+    column === null
+      ? ''
+      : ` · COL ${column + 1}${fist ? ' · FIST' : ''} · PINCH ${movePinchGap.toFixed(2)}${movePinched ? ' ✓' : ''}`;
   const now = performance.now();
   const motionNote = isCoolingDown(now) ? ' · COOLDOWN' : handMotion > FAST_MOVE_DISTANCE ? ' · MOVING' : '';
   const actionExtra =
@@ -588,6 +605,7 @@ function renderDebug(now) {
     ['— MOVE HAND', '', '', false],
     ['column pos', mv ? n(columnPos) : '—', `±${COLUMN_HYSTERESIS} past edge`, false],
     ['curl (fist)', mv ? n(mv.curl) : '—', `on <${FIST_ON_CURL} · off >${FIST_OFF_CURL}`, fist],
+    ['pinch gap', mv ? n(movePinchGap) : '—', `rotate <${PINCH_ON} · reset >${PINCH_OFF}`, movePinched],
     ['— ACTION HAND', '', '', false],
     ['twist °', ac ? n(twistDelta, 0) : '—', `≤-${TWIST_TRIGGER_DEG} fire · ±${TWIST_REARM_DEG} re-arm`, !twistArmed],
     ['pinch gap', ac ? n(pinchGap) : '—', `hold <${PINCH_ON} · reset >${PINCH_OFF}`, pinched],
