@@ -1,8 +1,10 @@
 // main.js — wires the game to the keyboard and runs the game loop.
 import './style.css';
 import * as game from './game.js';
+import { initHands, updateHands, swapHands } from './hands.js';
 
 game.init(document.getElementById('game'));
+initHands(); // async; the keyboard works while the camera loads (or if it's denied)
 
 // ---------- Keyboard ----------
 // Keys whose default browser action (scrolling) we block.
@@ -18,6 +20,10 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.code === 'KeyP' && !e.repeat) {
     game.togglePause();
+    return;
+  }
+  if (e.code === 'KeyS' && !e.repeat) {
+    swapHands();
     return;
   }
   if (status !== 'playing') return;
@@ -57,6 +63,7 @@ let last = performance.now();
 function loop(now) {
   const dt = Math.min(now - last, 100); // clamp so a background tab doesn't jump ahead
   last = now;
+  updateHands(); // runs hand detection once per new camera frame
   game.update(dt);
   game.draw();
   requestAnimationFrame(loop);

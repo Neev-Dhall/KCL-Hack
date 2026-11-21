@@ -17,10 +17,19 @@
 
     <main id="layout">
       <canvas id="game" width="480" height="600"></canvas>
+
+      <section id="camera-panel">
+        <div id="cam-box">
+          <video id="cam" playsinline muted></video>
+          <canvas id="overlay" width="320" height="240"></canvas>
+          <div id="cam-message" hidden></div>
+        </div>
+        <div id="hand-status">Waiting for camera…</div>
+      </section>
     </main>
 
     <footer id="keys">
-      ← → move · ↓ soft drop · ↑/X rotate ↻ · Z rotate ↺ · SPACE slam · C hold · P pause · ENTER start
+      ← → move · ↓ soft drop · ↑/X rotate ↻ · Z rotate ↺ · SPACE slam · C hold · P pause · ENTER start · S swap hands
     </footer>
 
     <script type="module" src="/src/main.js"></script>
