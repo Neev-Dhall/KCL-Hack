@@ -7,6 +7,7 @@
 import './style.css';
 import { startTracker, detectHands, drawSkeleton, enablePose, isPoseReady, detectPose, drawArms } from './tracker.js';
 import { unlockAudio, toggleMute, playEvent, startMusic, stopMusic } from './sound.js';
+import { createHandMenu } from './handmenu.js';
 
 // =====================================================================
 // TUNING — every gameplay and gesture number lives here.
@@ -302,6 +303,8 @@ function updatePose() {
   const now = performance.now();
   countFps(now);
   latestPose = pose.landmarks ? pose : null;
+  // Wrists drive the menu cursors in WINGS mode.
+  menu.feed(latestPose ? [15, 16].filter((i) => (pose.landmarks[i].visibility ?? 1) > 0.5).map((i) => ({ x: 1 - pose.landmarks[i].x, y: pose.landmarks[i].y })) : []);
 
   // Arm height: wrists above the shoulder line, in shoulder-widths.
   armsHeight = null;
@@ -342,6 +345,7 @@ function updateHands() {
   const hands = detectHands();
   if (!hands) return; // no new camera frame
   latestHands = hands;
+  menu.feed(hands.map((h) => ({ x: h.screenX, y: h.landmarks[9].y })));
   const now = performance.now();
   countFps(now);
 
@@ -770,6 +774,7 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   if (['Space', 'ArrowUp', 'KeyW', 'Enter'].includes(e.code)) flap();
   if (e.code === 'KeyP') togglePause();
+  if (e.code === 'Escape' && state !== 'playing') location.href = './';
   if (e.code === 'KeyT') toggleMode();
   if (e.code === 'KeyD') {
     debugOn = !debugOn;
@@ -805,6 +810,21 @@ startTracker(document.getElementById('cam'), (s) => {
   }
 });
 
+// ---------- Hand menu: hover a hand (or wrist) over ARCADE / PLAY on menu screens ----------
+const menu = createHandMenu([
+  { id: 'arcade', side: 'left', label: '◀ ARCADE', action: () => (location.href = './') },
+  {
+    id: 'play',
+    side: 'right',
+    label: 'PLAY ▶',
+    action: () => {
+      unlockAudio();
+      if (state === 'paused') togglePause();
+      else if (state === 'start' || state === 'over') startGame();
+    },
+  },
+]);
+
 // ---------- Loop ----------
 let last = performance.now();
 let musicOn = false;
@@ -816,6 +836,8 @@ function loop(now) {
   updateTracking();
   update(dt);
   draw();
+  menu.setLabel('play', state === 'paused' ? 'RESUME ▶' : state === 'over' ? 'AGAIN ▶' : 'PLAY ▶');
+  menu.frame(now, state !== 'playing');
 
   const wantMusic = state === 'playing';
   if (wantMusic !== musicOn) {

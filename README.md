@@ -14,6 +14,8 @@
 
 **Retro Remix track · KCL Tech First Year Hack · built with JetBrains Air**
 
+🕹️ **Now part of HAND ARCADE:** open the site and you walk into a neon arcade with two cabinets, **Hand Stack** and **[Hand Glide](#-bonus-game-hand-glide)**. Point at a cabinet and hold a fist to play (or click, or use ←/→ and Enter). Esc in either game takes you back to the arcade.
+
 <img src="docs/media/hands-demo.gif" alt="A player controlling Hand Stack with both hands: cyan skeleton on the left hand picks the column band, pink skeleton on the right hand acts" width="720">
 
 *Real hand-tracking gameplay: the left hand (cyan) picks the column, the right hand (pink) rotates, holds and slams.*
@@ -76,7 +78,7 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (usually **http://localhost:5173**) in **Google Chrome**, allow camera access, then **make a fist with your right hand** or press **Enter** to start.
+Open the URL Vite prints (usually **http://localhost:5173**) in **Google Chrome** and allow camera access. That's the arcade lobby: hold a fist over the Hand Stack cabinet (or click it). Hand Stack itself is at `/stack.html` and Hand Glide at `/glide.html`. In Hand Stack, **make a fist with your right hand** or press **Enter** to start.
 
 > 🔊 Sound and music start after your first click or key press, because browsers block audio until then.
 > 📷 If the camera is blocked, the game says so and carries on with the keyboard.

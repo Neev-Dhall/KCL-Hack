@@ -2,7 +2,8 @@
 // and runs the game loop.
 import './style.css';
 import * as game from './game.js';
-import { initHands, updateHands, swapHands, toggleDebug } from './hands.js';
+import { initHands, updateHands, swapHands, toggleDebug, onHands } from './hands.js';
+import { createHandMenu } from './handmenu.js';
 import { unlockAudio, toggleMute, playEvent, startMusic, stopMusic } from './sound.js';
 
 const guide = document.getElementById('guide');
@@ -31,6 +32,9 @@ window.addEventListener('keydown', (e) => {
     switch (e.code) {
       case 'Enter':
         if (status === 'start' || status === 'over') game.start();
+        return;
+      case 'Escape':
+        if (status !== 'playing') location.href = './';
         return;
       case 'KeyP':
         game.togglePause();
@@ -77,6 +81,36 @@ window.addEventListener('keyup', (e) => {
   if (e.code === 'ArrowDown') game.setSoftDrop(false);
 });
 
+// ---------- Hand menu: hover a hand over ARCADE / PLAY on menu screens ----------
+const menu = createHandMenu([
+  { id: 'arcade', side: 'left', label: '◀ ARCADE', action: () => (location.href = './') },
+  {
+    id: 'play',
+    side: 'right',
+    label: 'PLAY ▶',
+    action: () => {
+      unlockAudio();
+      const { status } = game.getState();
+      if (status === 'paused') game.togglePause();
+      else if (status === 'start' || status === 'over') game.start();
+    },
+  },
+]);
+// Palm centres, mirrored to match the screen.
+onHands((hands) => menu.feed(hands.map((lm) => ({ x: 1 - lm[9].x, y: lm[9].y }))));
+
+// ---------- Best score (shown on the arcade cabinet) ----------
+const BEST_KEY = 'handarcade.best.stack';
+let lastStatus = 'start';
+
+function saveBest(score) {
+  try {
+    if (score > (Number(localStorage.getItem(BEST_KEY)) || 0)) localStorage.setItem(BEST_KEY, String(score));
+  } catch {
+    /* storage unavailable: the best score just isn't kept */
+  }
+}
+
 // ---------- Game loop ----------
 let last = performance.now();
 
@@ -87,7 +121,11 @@ function loop(now) {
   game.update(dt);
   game.draw();
 
-  const { status } = game.getState();
+  const { status, score } = game.getState();
+  if (status === 'over' && lastStatus !== 'over') saveBest(score);
+  lastStatus = status;
+  menu.setLabel('play', status === 'paused' ? 'RESUME ▶' : status === 'over' ? 'AGAIN ▶' : 'PLAY ▶');
+  menu.frame(now, status !== 'playing');
 
   // The big gesture guide shows before the first game; the compact
   // controls list shows from then on.

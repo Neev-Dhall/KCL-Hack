@@ -1,0 +1,409 @@
+/* arcade.css — the Hand Arcade lobby (index.html) */
+
+body.arcade {
+  display: block;
+  background: radial-gradient(ellipse at 50% 20%, #1b1450 0%, #0a0f2c 55%, #05071a 100%);
+}
+
+#room {
+  position: relative;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: 50% 45%;
+  transition: transform 0.7s cubic-bezier(0.6, 0, 0.9, 0.4);
+}
+
+/* Perspective neon floor grid, scrolling towards the viewer */
+#floor {
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  bottom: 0;
+  height: 45vh;
+  background-image:
+    linear-gradient(rgba(255, 43, 214, 0.45) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.35) 2px, transparent 2px);
+  background-size: 60px 60px;
+  transform: perspective(300px) rotateX(60deg);
+  transform-origin: 50% 100%;
+  mask-image: linear-gradient(to top, #000 30%, transparent 100%);
+  animation: floor-scroll 2.5s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes floor-scroll {
+  to {
+    background-position: 0 60px;
+  }
+}
+
+#marquee {
+  position: relative;
+  text-align: center;
+  padding: 22px 0 8px;
+}
+
+#marquee h1 {
+  font-size: clamp(22px, 4vw, 40px);
+  letter-spacing: 6px;
+}
+
+#marquee .tagline {
+  display: block; /* style.css hides taglines on short screens; the lobby has room */
+  font-size: 10px;
+  margin-top: 12px;
+  letter-spacing: 2px;
+}
+
+.flicker {
+  animation: flicker 6s infinite;
+}
+
+@keyframes flicker {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% {
+    opacity: 1;
+  }
+  20%, 24%, 55% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Cabinets ---------- */
+#cabinets {
+  position: relative;
+  flex: 1;
+  display: flex;
+  gap: clamp(30px, 8vw, 120px);
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 8px;
+  min-height: 0;
+}
+
+.cabinet {
+  --h: min(60vh, 500px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: var(--h);
+  width: calc(var(--h) * 0.52);
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.25s ease, filter 0.25s ease;
+  filter: brightness(0.75);
+  outline: none;
+}
+
+.cabinet.active {
+  transform: translateY(-8px) perspective(600px) rotateX(4deg) scale(1.04);
+  filter: brightness(1.1);
+}
+
+.cab-top {
+  width: 100%;
+  height: 13%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(#251a5c, #120c33);
+  border: 3px solid var(--glow);
+  border-radius: 10px 10px 2px 2px;
+  box-shadow: 0 0 14px var(--glow), inset 0 0 18px rgba(255, 255, 255, 0.08);
+  font-size: clamp(8px, calc(var(--h) * 0.026), 13px);
+  color: #fff;
+  text-shadow: 0 0 8px var(--glow), 0 0 18px var(--glow);
+}
+
+.cab-bezel {
+  position: relative;
+  width: 92%;
+  height: 50%;
+  margin-top: -2px;
+  padding: 7%;
+  background: linear-gradient(#17113d, #0b0824);
+  border-left: 3px solid var(--glow);
+  border-right: 3px solid var(--glow);
+  box-shadow: 0 0 10px var(--glow);
+}
+
+.cab-screen {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #050816;
+  border-radius: 8px;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.9), 0 0 0 2px #000, 0 0 16px var(--glow2);
+  image-rendering: pixelated;
+}
+
+.cab-insert {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 13%;
+  text-align: center;
+  font-size: clamp(6px, calc(var(--h) * 0.018), 9px);
+  color: #fff;
+  text-shadow: 0 0 6px var(--glow);
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.cab-best {
+  width: 92%;
+  padding: 5px 0;
+  text-align: center;
+  font-size: clamp(6px, calc(var(--h) * 0.018), 9px);
+  background: #0b0824;
+  border-left: 3px solid var(--glow);
+  border-right: 3px solid var(--glow);
+  color: #c6ff00;
+  text-shadow: 0 0 6px #c6ff00;
+}
+
+/* Slanted control panel with a joystick and buttons */
+.cab-panel {
+  position: relative;
+  width: 108%;
+  height: 10%;
+  background: linear-gradient(#2c2070, #160f3c);
+  border: 3px solid var(--glow);
+  border-radius: 4px;
+  transform: perspective(200px) rotateX(35deg);
+  box-shadow: 0 0 12px var(--glow);
+}
+
+.cab-panel i {
+  position: absolute;
+  top: 30%;
+  width: 9%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--glow2);
+  box-shadow: 0 0 8px var(--glow2);
+}
+
+.cab-panel .stick {
+  left: 15%;
+  top: 8%;
+  width: 7%;
+  background: #ff3b3b;
+  box-shadow: 0 0 8px #ff3b3b, 0 14px 0 -4px #888;
+}
+
+.cab-panel .btn {
+  left: 52%;
+}
+
+.cab-panel .b2 {
+  left: 66%;
+  background: var(--glow);
+  box-shadow: 0 0 8px var(--glow);
+}
+
+.cab-panel .b3 {
+  left: 80%;
+  background: #c6ff00;
+  box-shadow: 0 0 8px #c6ff00;
+}
+
+.cab-base {
+  position: relative;
+  flex: 1;
+  width: 92%;
+  background: linear-gradient(#150f38, #0a0722);
+  border: 3px solid var(--glow);
+  border-top: none;
+  box-shadow: 0 0 10px var(--glow);
+}
+
+.cab-base .coin {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  width: 16%;
+  height: 22%;
+  transform: translateX(-50%);
+  border: 2px solid #ffb300;
+  border-radius: 3px;
+  background: repeating-linear-gradient(#2b1d00 0 4px, #000 4px 6px);
+  box-shadow: 0 0 8px #ffb300;
+}
+
+.cabinet.active .cab-base .coin {
+  animation: blink 0.5s steps(1) infinite;
+}
+
+.cab-blurb {
+  position: absolute;
+  bottom: -22px;
+  margin: 0;
+  white-space: nowrap;
+  font-size: 7px;
+  opacity: 0.7;
+}
+
+#lobby-keys {
+  position: relative;
+  margin: 30px 0 14px;
+  text-align: center;
+  font-size: 8px;
+  line-height: 2;
+}
+
+#hand-hint {
+  color: #fff;
+  text-shadow: 0 0 8px var(--cyan);
+}
+
+.credit {
+  display: block;
+  margin-top: 4px;
+  font-size: 7px;
+  opacity: 0.5;
+}
+
+/* ---------- Hand cursor ---------- */
+#cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  pointer-events: none;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  filter: drop-shadow(0 0 8px var(--cyan));
+}
+
+#cursor[hidden] {
+  display: none;
+}
+
+#cursor svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+#cursor circle {
+  fill: none;
+  stroke-width: 4;
+}
+
+#cursor .ring-bg {
+  stroke: rgba(0, 229, 255, 0.35);
+}
+
+#cursor .ring {
+  stroke: var(--pink);
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  stroke-linecap: round;
+}
+
+/* ---------- Camera preview ---------- */
+#lobby-cam {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  width: 200px;
+  height: 150px;
+  border: 2px solid var(--cyan);
+  box-shadow: 0 0 12px var(--cyan);
+  background: #060a1f;
+  overflow: hidden;
+  z-index: 10;
+}
+
+#lobby-cam video,
+#lobby-cam canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#lobby-cam video {
+  object-fit: fill;
+  transform: scaleX(-1);
+  opacity: 0.5;
+}
+
+#cam-status {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  text-align: center;
+  font-size: 6px;
+  color: #fff;
+}
+
+#lobby-cam.off {
+  height: auto;
+  padding: 8px;
+}
+
+#lobby-cam.off video,
+#lobby-cam.off canvas {
+  display: none;
+}
+
+#lobby-cam.off #cam-status {
+  position: static;
+}
+
+/* ---------- Zoom into the chosen screen ---------- */
+#fade {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease-in 0.15s;
+  z-index: 30;
+}
+
+body.zooming #fade {
+  opacity: 1;
+}
+
+/* Small screens: stack the cabinets and allow scrolling */
+@media (max-width: 700px) {
+  body.arcade {
+    overflow: auto;
+  }
+  #room {
+    height: auto;
+  }
+  #cabinets {
+    flex-direction: column;
+    align-items: center;
+    gap: 50px;
+  }
+  .cabinet {
+    --h: 430px;
+  }
+  #lobby-cam {
+    width: 120px;
+    height: 90px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #floor,
+  .flicker {
+    animation: none;
+  }
+}

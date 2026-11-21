@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hand Stack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <!-- Reusable hand drawings for the gesture guide -->
+    <svg width="0" height="0" style="position: absolute">
+      <symbol id="hand-open" viewBox="0 0 40 48">
+        <rect x="9" y="22" width="22" height="20" rx="7" />
+        <rect x="9" y="6" width="5" height="20" rx="2.5" />
+        <rect x="15.5" y="2" width="5" height="22" rx="2.5" />
+        <rect x="22" y="4" width="5" height="21" rx="2.5" />
+        <rect x="28" y="10" width="4.5" height="17" rx="2.25" />
+        <rect x="1" y="22" width="12" height="5" rx="2.5" transform="rotate(35 7 24)" />
+      </symbol>
+      <symbol id="hand-fist" viewBox="0 0 40 48">
+        <rect x="8" y="16" width="25" height="24" rx="8" />
+        <rect x="11" y="13" width="5" height="9" rx="2.5" />
+        <rect x="17" y="12" width="5" height="9" rx="2.5" />
+        <rect x="23" y="13" width="5" height="9" rx="2.5" />
+        <rect x="6" y="24" width="14" height="5" rx="2.5" />
+      </symbol>
+      <!-- thumb + index tips touching, other fingers up -->
+      <symbol id="hand-pinch" viewBox="0 0 40 48">
+        <rect x="9" y="22" width="22" height="20" rx="7" />
+        <rect x="15.5" y="2" width="5" height="22" rx="2.5" />
+        <rect x="22" y="4" width="5" height="21" rx="2.5" />
+        <rect x="28" y="10" width="4.5" height="17" rx="2.25" />
+        <circle cx="7" cy="16" r="5" fill="none" stroke="currentColor" stroke-width="4" />
+      </symbol>
+    </svg>
+
+    <header>
+      <h1><span class="pink">HAND</span> <span class="cyan">STACK</span></h1>
+      <p class="tagline">a retro puzzle, played with your hands</p>
+      <p class="nav"><a class="nav-link" href="./">◀ ARCADE</a></p>
+    </header>
+
+    <main id="layout">
+      <div id="game-wrap">
+        <canvas id="game" width="480" height="600"></canvas>
+
+        <!-- Start screen gesture guide (shown only before the first game) -->
+        <div id="guide">
+          <h2><span class="pink">HAND</span> <span class="cyan">STACK</span></h2>
+          <p class="guide-sub">LEFT HAND MOVES · RIGHT HAND ACTS</p>
+
+          <div class="gesture move">
+            <svg class="icon" viewBox="0 0 64 48">
+              <rect x="2" y="4" width="4" height="40" class="band" />
+              <rect x="10" y="4" width="4" height="40" class="band" />
+              <rect x="50" y="4" width="4" height="40" class="band" />
+              <rect x="58" y="4" width="4" height="40" class="band" />
+              <use href="#hand-open" x="16" y="0" width="32" height="40" />
+              <path d="M8 46 h48 M8 46 l4 -3 M8 46 l4 3 M56 46 l-4 -3 M56 46 l-4 3" class="arrow" />
+            </svg>
+            <div><b>PALM · MOVE</b>Hover over a column band.<br />The piece slides there.</div>
+          </div>
+
+          <div class="gesture move">
+            <svg class="icon" viewBox="0 0 64 48">
+              <use href="#hand-fist" x="16" y="-2" width="32" height="40" />
+              <path d="M32 38 v8 M28 42 l4 4 l4 -4" class="arrow" />
+            </svg>
+            <div><b>FIST · SOFT DROP</b>Hold a fist to drop faster.</div>
+          </div>
+
+          <div class="gesture move">
+            <svg class="icon" viewBox="0 0 64 48">
+              <use href="#hand-pinch" x="16" y="2" width="32" height="40" />
+              <path d="M8 18 A26 26 0 0 1 56 18" class="arrow" />
+              <path d="M56 18 l-5 -1 M56 18 l1 -5" class="arrow" />
+            </svg>
+            <div><b>PINCH TAP · ROTATE ↻</b>Tap thumb and index<br />on your left hand.</div>
+          </div>
+
+          <div class="gesture action">
+            <svg class="icon" viewBox="0 0 64 48">
+              <use href="#hand-open" x="16" y="4" width="32" height="40" />
+              <path d="M50 14 A20 20 0 0 0 14 14" class="arrow" />
+              <path d="M14 14 l5 -1 M14 14 l-1 -5" class="arrow" />
+            </svg>
+            <div><b>TWIST LEFT · ROTATE ↺</b>Palm to camera, turn it<br />left like a dial, then back.</div>
+          </div>
+
+          <div class="gesture action">
+            <svg class="icon" viewBox="0 0 64 48">
+              <use href="#hand-pinch" x="16" y="2" width="32" height="40" />
+              <path d="M10 10 l4 4 M6 20 h6" class="trail" />
+            </svg>
+            <div><b>PINCH TAP · HOLD</b>Tap thumb and index<br />together, then let go.</div>
+          </div>
+
+          <div class="gesture action">
+            <svg class="icon" viewBox="0 0 64 48">
+              <use href="#hand-fist" x="16" y="-2" width="32" height="40" />
+              <path d="M32 38 v8 M28 42 l4 4 l4 -4" class="arrow" />
+              <path d="M12 10 l-4 -4 M10 20 h-6 M52 10 l4 -4 M54 20 h6" class="trail" />
+            </svg>
+            <div><b>FIST · SLAM</b>Close your right hand<br />to hard-drop the piece.</div>
+          </div>
+
+          <p class="guide-start">MAKE A FIST OR PRESS ENTER</p>
+        </div>
+      </div>
+
+      <section id="camera-panel">
+        <div id="cam-box">
+          <video id="cam" playsinline muted></video>
+          <canvas id="overlay" width="320" height="240"></canvas>
+          <div id="cam-message" hidden></div>
+        </div>
+        <div id="hand-status">Waiting for camera…</div>
+        <div id="debug" hidden>Waiting for the hand tracker…</div>
+
+        <!-- Compact controls reminder shown during play (hidden while debug is open) -->
+        <div id="controls" hidden>
+          <div class="ctl-col move">
+            <b>LEFT HAND</b>
+            <span>PALM ON BAND · MOVE</span>
+            <span>PINCH TAP · ROTATE ↻</span>
+            <span>HOLD FIST · SOFT DROP</span>
+          </div>
+          <div class="ctl-col action">
+            <b>RIGHT HAND</b>
+            <span>TWIST LEFT · ROTATE ↺</span>
+            <span>PINCH TAP · HOLD</span>
+            <span>FIST · SLAM</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer id="keys">
+      ← → move · ↓ soft drop · ↑/X ↻ · Z ↺ · SPACE slam · C hold · P pause · ENTER start ·
+      S swap hands · ESC arcade · D debug · M sound: <span id="sound-state">ON</span>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

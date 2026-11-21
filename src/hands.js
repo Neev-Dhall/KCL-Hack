@@ -155,6 +155,13 @@ export function toggleDebug() {
   debugEl.hidden = !debugOn;
 }
 
+// ---------- Raw hand results for other modules (e.g. the hand menu) ----------
+const handListeners = [];
+// fn receives MediaPipe's raw landmark lists (not mirrored) on every new result.
+export function onHands(fn) {
+  handListeners.push(fn);
+}
+
 // ---------- Per-frame update (called from the game loop) ----------
 export function updateHands() {
   if (!vision) return;
@@ -162,6 +169,7 @@ export function updateHands() {
   // result has arrived (and sends the next camera frame if the worker is free).
   const landmarks = vision.poll('hand');
   if (!landmarks) return;
+  for (const fn of handListeners) fn(landmarks);
 
   // Count tracking frames per second for the debug panel.
   fpsFrames++;
