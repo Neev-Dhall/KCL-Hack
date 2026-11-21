@@ -77,6 +77,18 @@ export function playEvent(name, value) {
     case 'gameover':
       tone(392, 0.6, { type: 'triangle', endFreq: 98, volume: 0.2 });
       break;
+    // Hand Glide
+    case 'flap':
+      tone(520, 0.08, { type: 'triangle', endFreq: 900, volume: 0.12 });
+      break;
+    case 'score':
+      tone(1047, 0.06, { volume: 0.07 });
+      tone(1568, 0.08, { volume: 0.07, delay: 0.05 });
+      break;
+    case 'crash':
+      tone(300, 0.4, { type: 'sawtooth', endFreq: 40, volume: 0.2 });
+      tone(90, 0.3, { type: 'square', endFreq: 30, volume: 0.12, delay: 0.05 });
+      break;
   }
 }
 

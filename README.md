@@ -14,7 +14,7 @@
 
 **Retro Remix track · KCL Tech First Year Hack · built with JetBrains Air**
 
-<img src="docs/media/demo.gif" alt="Hand Stack gameplay: pieces fall, line clears flash SINGLE, hold and next previews update" width="720">
+<img src="docs/media/hands-demo.gif" alt="A player controlling Hand Stack with both hands: cyan skeleton on the left hand picks the column band, pink skeleton on the right hand acts" width="720">
 
 [▶ Watch the full gameplay clip (42 s)](docs/media/human_game.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [How it works](#-how-it-works)
 
@@ -54,7 +54,15 @@ Hand tracking runs **entirely in the browser** with Google's MediaPipe. Nothing 
 | Debug panel (press D) |
 |---|
 | <img src="docs/media/debug-panel.png" alt="Debug panel listing every live gesture value next to its threshold, and the tracker running on GPU at 47 fps"> |
-f
+
+| Keyboard demo (scripted, 11 s) |
+|---|
+| <img src="docs/media/demo.gif" alt="Hand Stack keyboard gameplay: pieces fall, line clears flash SINGLE, hold and next previews update" width="720"> |
+
+> **About these captures:** the screenshots above, the keyboard demo and its [full 42 s clip](docs/media/gameplay.mp4) were recorded in headless Chrome. The game was driven by scripted **keyboard** input, and the camera was a blank synthetic feed. That's why their camera panels show no hands. The GIF at the top and the [hand-tracking clip](docs/media/human_game.mp4) are real webcam play.
+
+---
+
 ## 🚀 Quick start
 
 You need [Node.js](https://nodejs.org/) 20+, a webcam and an internet connection. The hand-tracking model loads from a CDN.
@@ -113,6 +121,21 @@ You go up a level every 10 lines. Gravity starts at 800 ms per row and gets 70 m
 
 ---
 
+## 🌠 Bonus game: Hand Glide
+
+A second, one-button arcade game using the same hand tracking. Steer a glowing comet through gaps in neon laser gates over a synthwave grid. **Close either hand into a fist to flap.** Open it again, then make another fist for the next flap.
+
+| Start | In flight |
+|---|---|
+| <img src="docs/media/glide-start.png" alt="Hand Glide start screen: comet over a striped synthwave sun, MAKE A FIST TO FLAP"> | <img src="docs/media/glide-play.png" alt="Hand Glide in flight: comet with trail between neon laser gates"> |
+
+- Open it from the **PLAY HAND GLIDE ▶** link under the Hand Stack title, or go to `/glide.html`.
+- Keyboard and mouse work too: **Space**, **↑** or **click** to flap, **P** to pause, **M** to mute.
+- The gaps get narrower and the scroll speed rises as your score climbs. Every 10 gates plays a jingle and speeds up the music.
+- Your best score is kept in your browser.
+
+---
+
 ## 🧠 How it works
 
 ```mermaid
@@ -134,6 +157,9 @@ The code is split so each file has one job, and the hand code can only reach the
 | [`src/hands.js`](src/hands.js) | Camera, MediaPipe hand tracking and gesture detection. It only calls the API that `game.js` exports. **Every gesture threshold is in one commented block at the top of the file.** |
 | [`src/sound.js`](src/sound.js) | Sound effects and an original 4-bar chiptune loop (Am–F–C–G), played by a small step sequencer on the Web Audio clock. |
 | [`src/main.js`](src/main.js) | Wires it all together: keyboard, sound, music, screens and the game loop. |
+| [`src/glide.js`](src/glide.js) + [`glide.html`](glide.html) | Hand Glide: physics, gates, drawing and fist-to-flap, with all tuning numbers at the top. |
+| [`src/tracker.js`](src/tracker.js) | Shared webcam + MediaPipe setup and hand measuring, used by Hand Glide. |
+| [`vite.config.js`](vite.config.js) | Builds both pages. |
 
 ### Gesture tricks
 

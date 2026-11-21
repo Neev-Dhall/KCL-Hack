@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hand Glide</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <header>
+      <h1><span class="pink">HAND</span> <span class="cyan">GLIDE</span></h1>
+      <p class="tagline">fly a neon comet through the gates</p>
+      <p class="nav"><a class="nav-link" href="./">◀ PLAY HAND STACK</a></p>
+    </header>
+
+    <main id="layout">
+      <canvas id="glide" width="480" height="600"></canvas>
+
+      <section id="camera-panel">
+        <div id="cam-box">
+          <video id="cam" playsinline muted></video>
+          <canvas id="overlay" width="320" height="240"></canvas>
+          <div id="cam-message" hidden></div>
+        </div>
+        <div id="hand-status">Waiting for camera…</div>
+
+        <div id="controls">
+          <div class="ctl-col move">
+            <b>EITHER HAND</b>
+            <span>OPEN, THEN FIST · FLAP</span>
+            <span>OPEN AGAIN · READY</span>
+          </div>
+          <div class="ctl-col action">
+            <b>GOAL</b>
+            <span>FLY THROUGH GAPS</span>
+            <span>DON'T TOUCH LASERS</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer id="keys">
+      SPACE / ↑ / click flap · P pause · M sound: <span id="sound-state">ON</span>
+    </footer>
+
+    <script type="module" src="/src/glide.js"></script>
+  </body>
+</html>
