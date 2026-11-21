@@ -37,8 +37,9 @@ const NEUTRAL_DRIFT = 0.02; // inside the re-arm zone, neutral moves 2%/frame to
 // be confused. It must also start from an open thumb, so opening out of a
 // fist (thumb already against the index) can't fire a pinch.
 const PINCH_ON = 0.45; // thumb tip within this of the index tip = pinch
-const PINCH_OFF = 0.6; // gap must open above this (fingers straight) to arm the next pinch
-const PINCH_OTHERS_OUT = 1.3; // middle, ring + pinky tips at least this far from the wrist
+const PINCH_OFF = 0.6; // gap must open above this to arm the next pinch
+const PINCH_OTHERS_OUT = 1.15; // AVERAGE of middle, ring + pinky extension must be above this
+const PINCH_FIST_CURL = 1.1; // a real fist (curl below this) disarms until the thumb opens again
 const PINCH_CONFIRM_FRAMES = 2; // pinch must be seen this many frames in a row
 
 // --- Action hand: fast-movement guard ---
@@ -334,9 +335,10 @@ function updateSlam(hand, now, cooling) {
 function newPinch() {
   return {
     gap: 0, // thumb tip → index tip (palm lengths)
-    othersOut: false, // middle, ring + pinky all straight
+    others: 0, // average extension of middle, ring + pinky
+    othersOut: false, // those fingers are straight enough for an "OK sign"
     near: false, // thumb closing on the index with the other fingers straight
-    armed: false, // seen open (gap > PINCH_OFF, fingers straight) since the last pinch
+    armed: false, // thumb seen open (gap > PINCH_OFF) since the last pinch or fist
     frames: 0, // consecutive frames that look like a pinch
     down: false, // currently pinched (waiting for the fingers to open again)
   };
@@ -346,23 +348,25 @@ function newPinch() {
 function pinchTapped(p, hand, blocked) {
   const f = hand.fingers;
   p.gap = dist(hand.pts[4], hand.pts[8]) / hand.palm;
-  p.othersOut = Math.min(f.middle, f.ring, f.pinky) > PINCH_OTHERS_OUT;
+  p.others = (f.middle + f.ring + f.pinky) / 3;
+  p.othersOut = p.others > PINCH_OTHERS_OUT;
   p.near = p.othersOut && p.gap < PINCH_OFF;
 
-  // Thumb clearly open: the pinch is released, and armed if the fingers are straight.
+  // Thumb clearly open: any pinch is released and the next one is armed.
   if (p.gap > PINCH_OFF) {
     p.down = false;
     p.frames = 0;
-    p.armed = p.othersOut;
+    p.armed = true;
     return false;
   }
-  // Fingers curling (a fist forming) can never be a pinch, and must re-open first.
-  if (!p.othersOut) {
+  // A real fist disarms, so opening out of it (thumb still on the index) can't fire.
+  if (hand.curl < PINCH_FIST_CURL) {
     p.armed = false;
     p.frames = 0;
     return false;
   }
-  if (p.down || !p.armed || p.gap >= PINCH_ON) {
+  // Curled fingers (a fist forming) aren't an "OK sign".
+  if (p.down || !p.armed || !p.othersOut || p.gap >= PINCH_ON) {
     p.frames = 0;
     return false;
   }
@@ -635,11 +639,11 @@ function renderDebug(now) {
     ['column pos', mv ? n(columnPos) : '—', `±${COLUMN_HYSTERESIS} past edge`, false],
     ['curl (fist)', mv ? n(mv.curl) : '—', `on <${FIST_ON_CURL} · off >${FIST_OFF_CURL}`, fist],
     ['pinch gap', mv ? n(leftPinch.gap) : '—', `rotate <${PINCH_ON} · arm >${PINCH_OFF}`, leftPinch.down],
-    ['3 fingers out', mv ? n(Math.min(mv.fingers.middle, mv.fingers.ring, mv.fingers.pinky)) : '—', `>${PINCH_OTHERS_OUT} for pinch`, leftPinch.othersOut],
+    ['3 fingers avg', mv ? n(leftPinch.others) : '—', `>${PINCH_OTHERS_OUT} · ${leftPinch.armed ? 'ARMED' : 'open thumb to arm'}`, leftPinch.othersOut],
     ['— ACTION HAND', '', '', false],
     ['twist °', ac ? n(twistDelta, 0) : '—', `≤-${TWIST_TRIGGER_DEG} fire · ±${TWIST_REARM_DEG} re-arm`, !twistArmed],
     ['pinch gap', ac ? n(rightPinch.gap) : '—', `hold <${PINCH_ON} · arm >${PINCH_OFF}`, rightPinch.down],
-    ['3 fingers out', f ? n(Math.min(f.middle, f.ring, f.pinky)) : '—', `>${PINCH_OTHERS_OUT} for pinch`, rightPinch.othersOut],
+    ['3 fingers avg', ac ? n(rightPinch.others) : '—', `>${PINCH_OTHERS_OUT} · ${rightPinch.armed ? 'ARMED' : 'open thumb to arm'}`, rightPinch.othersOut],
     ['motion', ac ? n(handMotion) : '—', `>${FAST_MOVE_DISTANCE} in ${MOTION_WINDOW_MS}ms blocks`, handMotion > FAST_MOVE_DISTANCE],
     ['curl (slam)', ac ? n(ac.curl) : '—', `fist <${SLAM_FIST_CURL} · re-open >${SLAM_OPEN_CURL}`, slamArmed],
     ['cooldown ms', n(cooldownLeft, 0), `${GESTURE_COOLDOWN_MS}`, cooldownLeft > 0],
