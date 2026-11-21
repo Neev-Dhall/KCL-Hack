@@ -125,9 +125,10 @@ You go up a level every 10 lines. Gravity starts at 800 ms per row and gets 70 m
 
 ## 🌠 Bonus game: Hand Glide
 
-A second arcade game using the same hand tracking. Steer a glowing comet through gaps in neon laser gates over a synthwave grid. It has two control modes (**T** switches):
+A second arcade game using the same hand tracking. Steer a glowing comet through gaps in neon laser gates over a synthwave grid. It has three control modes (**T** cycles):
 
-- **FLAP mode:** squeeze either hand to flap. Quick half-squeezes count, so you don't need to open fully between flaps.
+- **WINGS mode (default): flap your arms like wings.** Stand back so your shoulders and hands are in view. Each downstroke flaps the comet, and raising your arms gets the next flap ready. This mode uses MediaPipe's **body pose** tracker (shoulders, elbows, wrists), which copes with fast arm movement much better than hand tracking.
+- **SQUEEZE mode:** squeeze either hand to flap. Quick half-squeezes count.
 - **STEER mode:** the comet follows your palm's height. Raise your hand to climb and lower it to dive. If your hand leaves the camera, gravity takes over.
 
 | Start | In flight |
@@ -163,7 +164,7 @@ The code is split so each file has one job, and the hand code can only reach the
 | [`src/sound.js`](src/sound.js) | Sound effects and an original 4-bar chiptune loop (Am–F–C–G), played by a small step sequencer on the Web Audio clock. |
 | [`src/main.js`](src/main.js) | Wires it all together: keyboard, sound, music, screens and the game loop. |
 | [`src/glide.js`](src/glide.js) + [`glide.html`](glide.html) | Hand Glide: physics, gates, drawing and fist-to-flap, with all tuning numbers at the top. |
-| [`src/tracker.js`](src/tracker.js) | Shared webcam + MediaPipe setup and hand measuring, used by Hand Glide. |
+| [`src/tracker.js`](src/tracker.js) | Shared webcam + MediaPipe setup for Hand Glide: hand tracking, plus body-pose tracking for wing flapping (loaded on demand). |
 | [`vite.config.js`](vite.config.js) | Builds both pages. |
 
 ### Gesture tricks

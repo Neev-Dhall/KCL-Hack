@@ -1,9 +1,11 @@
 // glide.js — Hand Glide: steer a neon comet through laser gates.
-// Two control modes (T switches):
-//   FLAP  — close either hand into a fist to flap (or Space / ↑ / click)
-//   STEER — the comet follows your palm's height; lose your hand and gravity takes over
+// Three control modes (T cycles):
+//   WINGS   — flap your arms like wings; each downstroke flaps (uses body pose tracking)
+//   SQUEEZE — squeeze either hand to flap
+//   STEER   — the comet follows your palm's height; lose your hand and gravity takes over
+// Space / ↑ / click always flap too.
 import './style.css';
-import { startTracker, detectHands, drawSkeleton } from './tracker.js';
+import { startTracker, detectHands, drawSkeleton, enablePose, isPoseReady, detectPose, drawArms } from './tracker.js';
 import { unlockAudio, toggleMute, playEvent, startMusic, stopMusic } from './sound.js';
 
 // =====================================================================
@@ -31,9 +33,15 @@ const MOVING_GATE_RANGE = 45; // px the gap slides each way
 const RESTART_DELAY_MS = 800; // after a crash, wait this long before a flap restarts
 const SHAKE_MS = 350; // screen shake after a crash
 
-// FLAP mode: fist = flap (either hand). Curl = avg fingertip→wrist distance in palm lengths.
-// A flap is a SQUEEZE: curl dropping quickly from its recent high, so quick
-// half-open / half-close pumps count (you don't have to open fully each time).
+// WINGS mode: arm height = how far your wrists are above your shoulders, in
+// shoulder-widths (so it works at any distance). A flap is a DOWNSTROKE: arm
+// height dropping from its recent high; raising your arms again re-arms it.
+const WING_DROP = 0.6; // arms fall this far (shoulder-widths) below their recent high → flap
+const WING_RISE = 0.3; // arms rise this far above their recent low → ready again
+const POSE_VISIBLE = 0.5; // a shoulder / wrist counts as seen above this visibility
+
+// SQUEEZE mode: curl = avg fingertip→wrist distance in palm lengths. A flap is
+// curl dropping from its recent high, so quick half-squeezes count.
 const SQUEEZE_DROP = 0.35; // curl falls this much below its recent high → flap
 const REOPEN_RISE = 0.2; // curl rises this much above its recent low → ready again
 
@@ -59,7 +67,8 @@ const debugEl = document.getElementById('debug');
 const controlsEl = document.getElementById('controls');
 
 // ---------- State ----------
-let mode = 'flap'; // 'flap' | 'steer'
+const MODES = ['wings', 'squeeze', 'steer'];
+let mode = 'wings';
 let state = 'start'; // 'start' | 'playing' | 'paused' | 'over'
 let overAt = 0;
 let y = H / 2;
@@ -69,17 +78,21 @@ let trail = []; // recent comet positions
 let particles = []; // crash sparks
 let popups = []; // floating "+1"s
 let score = 0;
-const best = { flap: loadBest('flap'), steer: loadBest('steer') };
+const best = Object.fromEntries(MODES.map((m) => [m, loadBest(m)]));
 let scroll = 0; // background scroll distance
 let clock = 0; // seconds of play, drives moving gates
 let shakeUntil = 0;
 let flashUntil = 0; // "FLAP!" on the camera view
 let debugOn = false;
 
-// Hand state.
+// Tracking state.
+let trackerReady = false;
 let latestHands = [];
-// Per screen side: { armed, curl, high, low } — see updateSqueeze().
-const sides = { left: newSqueeze(), right: newSqueeze() };
+let latestPose = null; // { landmarks, pts } or null when nobody is in view
+let armsHeight = null; // wrists above shoulders, in shoulder-widths
+let wing = newDetector(); // downstroke detector for WINGS mode
+// Per screen side: squeeze detectors for SQUEEZE mode — see updateDetector().
+const sides = { left: newDetector(), right: newDetector() };
 let steerHand = null; // the hand currently steering (STEER mode)
 let steerPalmY = null; // palm height (0..1) of the steering hand
 let lastHandSeen = -Infinity;
@@ -91,7 +104,7 @@ let fpsStart = 0;
 function startGame() {
   state = 'playing';
   y = H / 2;
-  vy = mode === 'flap' ? FLAP_VELOCITY : 0;
+  vy = mode === 'steer' ? 0 : FLAP_VELOCITY;
   gates = [];
   trail = [];
   particles = [];
@@ -135,7 +148,8 @@ function togglePause() {
 
 function toggleMode() {
   if (state === 'playing' || state === 'paused') return; // switch between games only
-  mode = mode === 'flap' ? 'steer' : 'flap';
+  mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+  if (mode === 'wings') enablePose();
   renderControls();
 }
 
@@ -145,9 +159,14 @@ function isSteering() {
 }
 
 // Best scores are a per-browser convenience; the game works without storage.
+// The squeeze mode keeps the original key so earlier best scores carry over.
+function bestKey(m) {
+  return m === 'squeeze' ? 'handglide-best' : `handglide-best-${m}`;
+}
+
 function loadBest(m) {
   try {
-    return Number(localStorage.getItem(m === 'flap' ? 'handglide-best' : 'handglide-best-steer')) || 0;
+    return Number(localStorage.getItem(bestKey(m))) || 0;
   } catch {
     return 0;
   }
@@ -155,7 +174,7 @@ function loadBest(m) {
 
 function saveBest(m, v) {
   try {
-    localStorage.setItem(m === 'flap' ? 'handglide-best' : 'handglide-best-steer', String(v));
+    localStorage.setItem(bestKey(m), String(v));
   } catch {
     /* storage unavailable: best score just isn't kept */
   }
@@ -256,19 +275,75 @@ function hitsRect(rx, ry, rw, rh) {
   return Math.hypot(ORB_X - cx, y - cy) < ORB_R;
 }
 
-// ---------- Hands ----------
-function updateHands() {
-  const hands = detectHands();
-  if (!hands) return; // no new camera frame
-  latestHands = hands;
-  const now = performance.now();
+// ---------- Tracking ----------
+// WINGS mode runs the body-pose model; the other modes run the hand model.
+function updateTracking() {
+  if (mode === 'wings') updatePose();
+  else updateHands();
+}
 
+function countFps(now) {
   fpsFrames++;
   if (now - fpsStart >= 1000) {
     fps = fpsFrames;
     fpsFrames = 0;
     fpsStart = now;
   }
+}
+
+// ---------- WINGS: arm flapping ----------
+function updatePose() {
+  if (trackerReady && !isPoseReady()) {
+    statusEl.textContent = 'Loading arm tracker…';
+    return;
+  }
+  const pose = detectPose();
+  if (pose === null) return; // no new camera frame
+  const now = performance.now();
+  countFps(now);
+  latestPose = pose.landmarks ? pose : null;
+
+  // Arm height: wrists above the shoulder line, in shoulder-widths.
+  armsHeight = null;
+  if (latestPose) {
+    const p = latestPose.pts;
+    const seen = (i) => p[i].visibility > POSE_VISIBLE;
+    const shoulderW = dist(p[11], p[12]);
+    const wrists = [15, 16].filter(seen);
+    if (seen(11) && seen(12) && shoulderW > 0.02 && wrists.length) {
+      const shoulderY = (p[11].y + p[12].y) / 2;
+      const wristY = wrists.reduce((sum, i) => sum + p[i].y, 0) / wrists.length;
+      armsHeight = (shoulderY - wristY) / shoulderW;
+    }
+  }
+
+  if (armsHeight === null) {
+    wing = newDetector(); // start fresh when the arms come back into view
+  } else if (updateDetector(wing, armsHeight, WING_DROP, WING_RISE)) {
+    flashUntil = now + 220;
+    flap();
+  }
+
+  drawOverlay();
+  statusEl.innerHTML =
+    armsHeight === null
+      ? `<div class="move">ARMS: not seen — step back so your shoulders and hands are in view</div>`
+      : `<div class="move">ARMS: TRACKING · height ${armsHeight >= 0 ? '+' : ''}${armsHeight.toFixed(2)}${wing.armed ? ' · READY' : ''}</div>`;
+  statusEl.innerHTML += `<div class="mode">MODE: WINGS (T to switch)</div>`;
+  if (debugOn) renderDebug(now);
+}
+
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// ---------- SQUEEZE + STEER: hands ----------
+function updateHands() {
+  const hands = detectHands();
+  if (!hands) return; // no new camera frame
+  latestHands = hands;
+  const now = performance.now();
+  countFps(now);
 
   // STEER: follow the hand nearest to where the steering palm just was, so the
   // comet doesn't jump if a second hand appears (MediaPipe's order can swap).
@@ -283,16 +358,16 @@ function updateHands() {
     steerHand = null;
   }
 
-  // Squeezes: flap in FLAP mode; in both modes a squeeze starts / restarts the game.
+  // Squeezes: flap in SQUEEZE mode; in STEER mode a squeeze starts / restarts the game.
   const bySide = { left: null, right: null };
   for (const h of hands) bySide[h.screenX < 0.5 ? 'left' : 'right'] = h;
   for (const side of ['left', 'right']) {
     const h = bySide[side];
     if (!h) {
-      sides[side] = newSqueeze(); // forget this side until a hand shows up again
+      sides[side] = newDetector(); // forget this side until a hand shows up again
       continue;
     }
-    if (updateSqueeze(sides[side], h.curl) && (mode === 'flap' || state !== 'playing')) {
+    if (updateDetector(sides[side], h.curl, SQUEEZE_DROP, REOPEN_RISE) && (mode === 'squeeze' || state !== 'playing')) {
       flashUntil = now + 220;
       flap();
     }
@@ -308,34 +383,35 @@ function updateHands() {
   if (debugOn) renderDebug(now);
 }
 
-// ---------- Squeeze detector (one per screen side) ----------
-function newSqueeze() {
-  return { armed: false, curl: null, high: null, low: null };
+// ---------- Drop detector (wing downstrokes and hand squeezes) ----------
+function newDetector() {
+  return { armed: false, value: null, high: null, low: null };
 }
 
-// Returns true once per squeeze. While armed it tracks the highest curl seen;
-// a drop of SQUEEZE_DROP below that = flap. Then it tracks the lowest curl,
-// and re-arms once the hand opens REOPEN_RISE above it.
-function updateSqueeze(s, curl) {
-  s.curl = curl;
+// Returns true once per "drop". While armed it tracks the highest value seen;
+// falling `drop` below that = flap. Then it tracks the lowest value, and
+// re-arms once the value climbs `rise` above it. Used for arm height (WINGS)
+// and hand curl (SQUEEZE), so partial strokes count and jitter doesn't.
+function updateDetector(s, value, drop, rise) {
+  s.value = value;
   if (s.high === null) {
-    // New hand: ready straight away, measured from where it is now.
+    // Just appeared: ready straight away, measured from where it is now.
     s.armed = true;
-    s.high = s.low = curl;
+    s.high = s.low = value;
     return false;
   }
   if (s.armed) {
-    s.high = Math.max(s.high, curl);
-    if (s.high - curl >= SQUEEZE_DROP) {
+    s.high = Math.max(s.high, value);
+    if (s.high - value >= drop) {
       s.armed = false;
-      s.low = curl;
+      s.low = value;
       return true;
     }
   } else {
-    s.low = Math.min(s.low, curl);
-    if (curl - s.low >= REOPEN_RISE) {
+    s.low = Math.min(s.low, value);
+    if (value - s.low >= rise) {
       s.armed = true;
-      s.high = curl;
+      s.high = value;
     }
   }
   return false;
@@ -369,7 +445,20 @@ function drawOverlay() {
     octx.restore();
   }
 
-  for (const hand of latestHands) drawSkeleton(octx, hand, hand.screenX < 0.5 ? '#00e5ff' : '#ff2bd6');
+  if (mode === 'wings') {
+    if (latestPose) drawArms(octx, latestPose, wing.armed ? '#c6ff00' : '#ff2bd6');
+    if (armsHeight === null) {
+      octx.save();
+      octx.font = `8px ${FONT}`;
+      octx.textAlign = 'center';
+      octx.fillStyle = '#ffe600';
+      octx.fillText('STEP BACK: SHOULDERS', w / 2, h - 30);
+      octx.fillText('AND HANDS IN VIEW', w / 2, h - 16);
+      octx.restore();
+    }
+  } else {
+    for (const hand of latestHands) drawSkeleton(octx, hand, hand.screenX < 0.5 ? '#00e5ff' : '#ff2bd6');
+  }
 
   if (performance.now() < flashUntil) {
     octx.save();
@@ -383,25 +472,32 @@ function drawOverlay() {
   }
 }
 
-// Debug text: how far the hand has squeezed (or re-opened) vs the threshold.
-function sqzInfo(s) {
-  if (s.curl === null) return `drop ${SQUEEZE_DROP} · rise ${REOPEN_RISE}`;
-  return s.armed
-    ? `squeeze ${(s.high - s.curl).toFixed(2)} / ${SQUEEZE_DROP}`
-    : `re-open ${(s.curl - s.low).toFixed(2)} / ${REOPEN_RISE}`;
+// Debug text: how far the value has dropped (armed) or climbed back (re-arming).
+function dropInfo(s, drop, rise) {
+  if (s.value === null) return `drop ${drop} · rise ${rise}`;
+  return s.armed ? `drop ${(s.high - s.value).toFixed(2)} / ${drop}` : `rise ${(s.value - s.low).toFixed(2)} / ${rise}`;
 }
 
-// D key: live hand values next to their thresholds.
+// D key: live tracking values next to their thresholds.
 function renderDebug() {
   const n = (v, d = 2) => (v === null || v === undefined ? '—' : Number(v).toFixed(d));
-  const rows = [
-    ['TRACKER', `${fps} fps · ${latestHands.length} hand(s)`, '', false],
-    ['mode', mode.toUpperCase(), 'T to switch', false],
-    ['left curl', n(sides.left.curl), sqzInfo(sides.left), sides.left.armed],
-    ['right curl', n(sides.right.curl), sqzInfo(sides.right), sides.right.armed],
-    ['palm height', n(steerPalmY), `${STEER_TOP} top → ${STEER_BOTTOM} floor`, isSteering()],
-    ['comet y', n(y, 0), `0 → ${FLOOR_Y}`, false],
-  ];
+  const rows =
+    mode === 'wings'
+      ? [
+          ['TRACKER', `pose · ${fps} fps`, '', false],
+          ['mode', 'WINGS', 'T to switch', false],
+          ['arms height', n(armsHeight), 'above shoulders (widths)', armsHeight !== null],
+          ['downstroke', armsHeight === null ? '—' : wing.armed ? 'READY' : 'raise arms', dropInfo(wing, WING_DROP, WING_RISE), wing.armed],
+          ['comet y', n(y, 0), `0 → ${FLOOR_Y}`, false],
+        ]
+      : [
+          ['TRACKER', `hands · ${fps} fps · ${latestHands.length} seen`, '', false],
+          ['mode', mode.toUpperCase(), 'T to switch', false],
+          ['left curl', n(sides.left.value), dropInfo(sides.left, SQUEEZE_DROP, REOPEN_RISE), sides.left.armed],
+          ['right curl', n(sides.right.value), dropInfo(sides.right, SQUEEZE_DROP, REOPEN_RISE), sides.right.armed],
+          ['palm height', n(steerPalmY), `${STEER_TOP} top → ${STEER_BOTTOM} floor`, isSteering()],
+          ['comet y', n(y, 0), `0 → ${FLOOR_Y}`, false],
+        ];
   debugEl.innerHTML =
     '<table>' +
     rows
@@ -411,12 +507,15 @@ function renderDebug() {
 }
 
 function renderControls() {
-  controlsEl.innerHTML =
-    mode === 'flap'
-      ? `<div class="ctl-col move"><b>FLAP MODE</b><span>SQUEEZE HAND · FLAP</span><span>EITHER HAND WORKS</span></div>
-         <div class="ctl-col action"><b>GOAL</b><span>FLY THROUGH GAPS</span><span>T · TRY STEER MODE</span></div>`
-      : `<div class="ctl-col move"><b>STEER MODE</b><span>RAISE HAND · GO UP</span><span>LOWER HAND · GO DOWN</span></div>
-         <div class="ctl-col action"><b>GOAL</b><span>KEEP HAND IN VIEW</span><span>T · BACK TO FLAP</span></div>`;
+  const panels = {
+    wings: `<div class="ctl-col move"><b>WINGS MODE</b><span>FLAP YOUR ARMS · FLAP</span><span>STAND BACK FROM CAMERA</span></div>
+            <div class="ctl-col action"><b>GOAL</b><span>FLY THROUGH GAPS</span><span>T · NEXT MODE</span></div>`,
+    squeeze: `<div class="ctl-col move"><b>SQUEEZE MODE</b><span>SQUEEZE HAND · FLAP</span><span>EITHER HAND WORKS</span></div>
+              <div class="ctl-col action"><b>GOAL</b><span>FLY THROUGH GAPS</span><span>T · NEXT MODE</span></div>`,
+    steer: `<div class="ctl-col move"><b>STEER MODE</b><span>RAISE HAND · GO UP</span><span>LOWER HAND · GO DOWN</span></div>
+            <div class="ctl-col action"><b>GOAL</b><span>KEEP HAND IN VIEW</span><span>T · NEXT MODE</span></div>`,
+  };
+  controlsEl.innerHTML = panels[mode];
 }
 
 // ---------- Drawing ----------
@@ -626,22 +725,23 @@ function drawHud() {
     ctx.save();
     ctx.font = `7px ${FONT}`;
     ctx.fillStyle = mode === 'steer' ? '#c6ff00' : '#8fa3ff';
-    ctx.fillText(mode === 'steer' ? (isSteering() ? 'STEER ✋' : 'STEER · HAND LOST!') : 'FLAP', 12, H - 14);
+    const label = { wings: 'WINGS', squeeze: 'SQUEEZE' }[mode] || (isSteering() ? 'STEER ✋' : 'STEER · HAND LOST!');
+    ctx.fillText(label, 12, H - 14);
     ctx.restore();
   }
   if (state === 'start') {
     glowText('HAND', W / 2, 170, 34, '#ff2bd6');
     glowText('GLIDE', W / 2, 218, 34, '#00e5ff');
-    glowText(mode === 'flap' ? '◀ FLAP MODE ▶' : '◀ STEER MODE ▶', W / 2, 330, 10, '#ffe600');
-    if (mode === 'flap') {
-      glowText('SQUEEZE YOUR HAND TO FLAP', W / 2, 362, 10, '#c6ff00');
-      glowText('quick half-squeezes work', W / 2, 384, 8, '#8fa3ff');
-    } else {
-      glowText('RAISE / LOWER YOUR HAND', W / 2, 362, 11, '#c6ff00');
-      glowText('the comet follows your palm', W / 2, 384, 8, '#8fa3ff');
-    }
+    glowText(`◀ ${mode.toUpperCase()} MODE ▶`, W / 2, 330, 10, '#ffe600');
+    const howTo = {
+      wings: ['FLAP YOUR ARMS LIKE WINGS', 'stand back: shoulders + hands in view'],
+      squeeze: ['SQUEEZE YOUR HAND TO FLAP', 'quick half-squeezes work'],
+      steer: ['RAISE / LOWER YOUR HAND', 'the comet follows your palm'],
+    }[mode];
+    glowText(howTo[0], W / 2, 362, 10, '#c6ff00');
+    glowText(howTo[1], W / 2, 384, 8, '#8fa3ff');
     glowText('T to switch mode', W / 2, 404, 8, '#8fa3ff');
-    if (blink()) glowText('SQUEEZE OR SPACE TO START', W / 2, 444, 10, '#ffffff');
+    if (blink()) glowText(mode === 'wings' ? 'FLAP OR SPACE TO START' : 'SQUEEZE OR SPACE TO START', W / 2, 444, 10, '#ffffff');
     if (best[mode]) glowText('BEST ' + best[mode], W / 2, 480, 9, '#8fa3ff');
   }
   if (state === 'paused') {
@@ -657,7 +757,7 @@ function drawHud() {
     glowText('SCORE ' + score, W / 2, 280, 14, '#c6ff00');
     glowText('BEST ' + best[mode], W / 2, 308, 10, '#8fa3ff');
     if (blink() && performance.now() - overAt > RESTART_DELAY_MS) {
-      glowText('SQUEEZE OR SPACE TO RETRY', W / 2, 380, 10, '#ffffff');
+      glowText(mode === 'wings' ? 'FLAP OR SPACE TO RETRY' : 'SQUEEZE OR SPACE TO RETRY', W / 2, 380, 10, '#ffffff');
     }
     glowText('T to switch mode', W / 2, 410, 8, '#8fa3ff');
   }
@@ -691,8 +791,10 @@ const STATUS_TEXT = {
   'camera-blocked': 'No camera — keyboard mode',
   'tracker-failed': 'No tracker — keyboard mode',
 };
+enablePose(); // WINGS is the default mode, so load the arm tracker up front
 startTracker(document.getElementById('cam'), (s) => {
   statusEl.textContent = STATUS_TEXT[s];
+  if (s === 'ready') trackerReady = true;
   if (s === 'camera-blocked' || s === 'tracker-failed') {
     const msg = document.getElementById('cam-message');
     msg.innerHTML =
@@ -711,7 +813,7 @@ renderControls();
 function loop(now) {
   const dt = Math.min(now - last, 50) / 1000; // seconds, clamped
   last = now;
-  updateHands();
+  updateTracking();
   update(dt);
   draw();
 
