@@ -20,7 +20,7 @@
 
 *Real hand-tracking gameplay: the left hand (cyan) picks the column, the right hand (pink) rotates, holds and slams.*
 
-[▶ Watch the full hand-tracking clip (40 s)](docs/media/human_game.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [Bonus: Hand Glide](#-bonus-game-hand-glide) · [How it works](#-how-it-works)
+[▶ Watch the full hand-tracking clip (40 s)](docs/media/human_game.mp4) · [▶ Hand Glide demo](docs/media/glide_demo.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [Bonus: Hand Glide](#-bonus-game-hand-glide) · [How it works](#-how-it-works)
 
 </div>
 
@@ -137,7 +137,9 @@ A second arcade game using the same hand tracking. Steer a glowing comet through
 |---|---|
 | <img src="docs/media/glide-start.png" alt="Hand Glide start screen: comet over a striped synthwave sun, MAKE A FIST TO FLAP"> | <img src="docs/media/glide-play.png" alt="Hand Glide in flight: comet with trail between neon laser gates"> |
 
-- Open it from the **PLAY HAND GLIDE ▶** link under the Hand Stack title, or go to `/glide.html`.
+**[▶ Watch the Hand Glide demo](docs/media/glide_demo.mp4)**: real webcam play, flying the comet through the gates.
+
+- Open it from the **Hand Glide** cabinet in the arcade lobby, or go to `/glide.html`. On the start, pause and game-over screens, hover a hand over **◀ ARCADE** or **PLAY ▶** for a second to choose.
 - Keyboard and mouse work too: **Space**, **↑** or **click** to flap, **T** to switch mode, **P** to pause, **D** for the debug panel, **M** to mute.
 - The gaps get narrower and the scroll speed rises as your score climbs. From 10 gates, some gates **slide up and down**. Every 10 gates plays a jingle and speeds up the music.
 - Crashes shake the screen and burst into sparks. Each mode keeps its own best score in your browser.
