@@ -461,7 +461,7 @@ function drawOverlay() {
     glowText('GAME', BOARD_W / 2, 220, 28, '#ff2bd6');
     glowText('OVER', BOARD_W / 2, 265, 28, '#ff2bd6');
     glowText('SCORE ' + score, BOARD_W / 2, 320, 12, '#c6ff00');
-    blinkText('GRAB OR ENTER', BOARD_W / 2, 370, 10);
+    blinkText('FIST OR ENTER', BOARD_W / 2, 370, 10);
     blinkText('TO RETRY', BOARD_W / 2, 390, 10);
   }
 }

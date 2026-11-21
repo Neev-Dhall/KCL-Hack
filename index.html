@@ -27,6 +27,24 @@
         <rect x="23" y="13" width="5" height="9" rx="2.5" />
         <rect x="6" y="24" width="14" height="5" rx="2.5" />
       </symbol>
+      <!-- thumb + index + middle out, ring + pinky curled -->
+      <symbol id="hand-bolt" viewBox="0 0 40 48">
+        <rect x="9" y="22" width="22" height="20" rx="7" />
+        <rect x="9" y="6" width="5" height="20" rx="2.5" />
+        <rect x="15.5" y="2" width="5" height="22" rx="2.5" />
+        <rect x="22" y="17" width="5" height="9" rx="2.5" />
+        <rect x="28" y="19" width="4.5" height="8" rx="2.25" />
+        <rect x="1" y="22" width="12" height="5" rx="2.5" transform="rotate(35 7 24)" />
+      </symbol>
+      <!-- index + middle out, the rest tucked -->
+      <symbol id="hand-two" viewBox="0 0 40 48">
+        <rect x="9" y="22" width="22" height="20" rx="7" />
+        <rect x="9" y="6" width="5" height="20" rx="2.5" />
+        <rect x="15.5" y="2" width="5" height="22" rx="2.5" />
+        <rect x="22" y="17" width="5" height="9" rx="2.5" />
+        <rect x="28" y="19" width="4.5" height="8" rx="2.25" />
+        <rect x="6" y="28" width="14" height="5" rx="2.5" />
+      </symbol>
     </svg>
 
     <header>
@@ -65,32 +83,32 @@
 
           <div class="gesture action">
             <svg class="icon" viewBox="0 0 64 48">
-              <use href="#hand-open" x="16" y="4" width="32" height="40" />
+              <use href="#hand-bolt" x="16" y="4" width="32" height="40" />
               <path d="M14 14 A20 20 0 0 1 50 14" class="arrow" />
               <path d="M50 14 l-5 -1 M50 14 l1 -5" class="arrow" />
             </svg>
-            <div><b>PINCH + TWIST · ROTATE</b>Pinch thumb + index, turn<br />like a dial: right ↻ left ↺</div>
+            <div><b>BOLT TWIST · ROTATE</b>Thumb, index + middle out.<br />Turn like undoing a bolt ↻ ↺</div>
           </div>
 
           <div class="gesture action">
             <svg class="icon" viewBox="0 0 64 48">
-              <use href="#hand-open" x="20" y="0" width="28" height="34" />
-              <path d="M12 6 v14 M8 12 v10" class="trail" />
-              <path d="M34 36 v10 M29 41 l5 5 l5 -5" class="arrow" />
+              <use href="#hand-two" x="24" y="2" width="32" height="40" />
+              <path d="M4 14 h14 M8 22 h10" class="trail" />
+              <path d="M6 32 h16 M18 28 l4 4 l-4 4" class="arrow" />
             </svg>
-            <div><b>SWIPE DOWN · SLAM</b>A fast downward swipe<br />hard-drops the piece.</div>
+            <div><b>TWO-FINGER SWISH · HOLD</b>Index + middle out,<br />swish quickly sideways.</div>
           </div>
 
           <div class="gesture action">
             <svg class="icon" viewBox="0 0 64 48">
-              <use href="#hand-open" x="0" y="6" width="26" height="34" />
-              <path d="M28 24 h8 M33 21 l3 3 l-3 3" class="arrow" />
-              <use href="#hand-fist" x="36" y="6" width="28" height="34" />
+              <use href="#hand-fist" x="16" y="-2" width="32" height="40" />
+              <path d="M32 38 v8 M28 42 l4 4 l4 -4" class="arrow" />
+              <path d="M12 10 l-4 -4 M10 20 h-6 M52 10 l4 -4 M54 20 h6" class="trail" />
             </svg>
-            <div><b>GRAB · HOLD</b>Snap open hand to fist<br />to hold the piece.</div>
+            <div><b>FIST · SLAM</b>Close your right hand<br />to hard-drop the piece.</div>
           </div>
 
-          <p class="guide-start">GRAB OR PRESS ENTER</p>
+          <p class="guide-start">MAKE A FIST OR PRESS ENTER</p>
         </div>
       </div>
 

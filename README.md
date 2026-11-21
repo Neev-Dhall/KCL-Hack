@@ -16,9 +16,9 @@ Left hand = **MOVE** hand (cyan). Right hand = **ACTION** hand (pink). Press **S
 |---|---|---|
 | Left | Palm over one of the 10 column bands on the camera view | Piece slides to that column |
 | Left | Hold a closed fist | Soft drop |
-| Right | Pinch thumb + index, then turn your hand like a dial right / left (release the pinch to reset) | Rotate clockwise / anticlockwise |
-| Right | Fast downward swipe | Hard drop ("slam") |
-| Right | Quick grab: open hand → fist | Hold the piece (also starts the game) |
+| Right | Thumb, index + middle out (ring + pinky curled), turn your hand like undoing a bolt right / left | Rotate clockwise / anticlockwise |
+| Right | Index + middle out, swish quickly sideways | Hold the piece |
+| Right | Close into a fist | Hard drop ("slam"); also starts the game |
 | Right (backup, **T** toggles) | Thumb + index pinch / thumb + middle pinch | Rotate clockwise / anticlockwise |
 
 ### Keyboard backup
@@ -63,8 +63,8 @@ Sound starts after your first click or key press, because browsers block audio u
 
 - **Scale-free:** every distance is measured in *palm lengths* (wrist to the middle-finger knuckle), so gestures work whether you're near the camera or far from it.
 - **Hysteresis everywhere:** columns, fists and pinches all use separate "on" and "off" thresholds, so they don't flicker at the edge.
-- **Pinch-clutch twist:** twisting only counts while thumb and index are pinched, like gripping a real dial. A 15° turn rotates once, and you can keep turning for more rotations. Release the pinch to bring your hand back without rotating anything.
-- **Slam guard:** after a slam, the right hand's gestures are ignored for 600 ms, and twists and grabs don't count while the hand is moving fast. That way a swipe can't accidentally rotate or hold the piece.
+- **Bolt-pose clutch:** twisting only counts while you hold the "bolt" pose (thumb, index and middle out), like gripping a real bolt. A 15° turn rotates once, and you can keep turning for more rotations. Drop the pose to bring your hand back without rotating anything.
+- **Gesture guard:** after a slam or a hold, the right hand's gestures are ignored for 600 ms, and twists don't count while the hand is moving fast. That way a sideways swish can't accidentally rotate the piece.
 
 Press **D** in game to see every live gesture value next to its threshold.
 
