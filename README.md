@@ -1,75 +1,54 @@
 <div align="center">
 
-# ✋ HAND STACK ✋
+# 🕹️ HAND ARCADE 🕹️
 
-**A neon falling-block puzzle you play with your bare hands.**
+**A neon arcade where your hands are the controller.**
 
-*An arcade idea from the 1980s, rebuilt for 2026 with real-time hand tracking in the browser.*
+*Three retro games, one webcam, no controllers. Hand tracking runs live in the browser.*
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-vanilla-f7df1e?style=flat-square&logo=javascript&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-8-646cff?style=flat-square&logo=vite&logoColor=white)
-![MediaPipe](https://img.shields.io/badge/MediaPipe-Hand_Landmarker-0097a7?style=flat-square)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-Hands_+_Pose-0097a7?style=flat-square)
 ![Web Audio](https://img.shields.io/badge/Web_Audio-synthesised-ff2bd6?style=flat-square)
 ![No frameworks](https://img.shields.io/badge/frameworks-none-00e5ff?style=flat-square)
 
 **Retro Remix track · KCL Tech First Year Hack · built with JetBrains Air**
 
-🕹️ **Now part of HAND ARCADE:** open the site and you walk into a neon arcade with two cabinets, **Hand Stack** and **[Hand Glide](#-bonus-game-hand-glide)**. Point at a cabinet and hold a fist to play (or click, or use ←/→ and Enter). Esc in either game takes you back to the arcade.
+<img src="docs/media/arcade-lobby.gif" alt="The Hand Arcade lobby: three neon cabinets (Hand Stack, Hand Glide, Hand Whack) with live attract-mode screens; one is chosen and the view zooms into it" width="800">
 
-<img src="docs/media/hands-demo.gif" alt="A player controlling Hand Stack with both hands: cyan skeleton on the left hand picks the column band, pink skeleton on the right hand acts" width="720">
-
-*Real hand-tracking gameplay: the left hand (cyan) picks the column, the right hand (pink) rotates, holds and slams.*
-
-[▶ Watch the full hand-tracking clip (40 s)](docs/media/human_game.mp4) · [▶ Hand Glide demo](docs/media/glide_demo.mp4) · [Quick start](#-quick-start) · [Controls](#-controls) · [Bonus: Hand Glide](#-bonus-game-hand-glide) · [How it works](#-how-it-works)
+[Quick start](#-quick-start) · [The arcade](#-the-arcade) · [🧱 Hand Stack](#-hand-stack) · [🌠 Hand Glide](#-hand-glide) · [🔨 Hand Whack](#-hand-whack) · [How it works](#-how-it-works)
 
 </div>
 
 ---
 
-## 🕹️ What is it?
+## ✋ What is it?
 
-Hand Stack is a falling-block puzzle in its own neon arcade style, but there's **no controller**. Your webcam watches both hands:
+Hand Arcade is a virtual arcade room with three cabinets. Each one is a complete game, and each is played with your body in front of a webcam rather than a keyboard or controller:
 
-- your **left hand** steers the falling piece across the board and drops it faster
-- your **right hand** rotates it, slams it down and puts it on hold
+| | Game | Genre | You play it by… |
+|---|---|---|---|
+| 🧱 | **[Hand Stack](#-hand-stack)** | Falling-block puzzle | steering with your left hand, rotating, holding and slamming with your right |
+| 🌠 | **[Hand Glide](#-hand-glide)** | Neon flyer | flapping your arms like wings (or squeezing / steering with a hand) |
+| 🔨 | **[Hand Whack](#-hand-whack)** | Whack-a-mole | aiming with your palms and squeezing to bring the hammer down |
 
-Hand tracking runs **entirely in the browser** with Google's MediaPipe. Nothing gets installed, and no video ever leaves your machine. If there's no camera, the whole game still plays on the keyboard.
+Everything runs **in the browser**. Nothing is installed, and no video ever leaves your machine. Every game also works with the keyboard and mouse if there's no camera.
 
-### Features
+### Shared features
 
-- 🖐️ **Two-handed gesture control:** six gestures across two hands, with live skeleton overlays (cyan = move hand, pink = action hand)
-- 🎯 **Column bands:** ten numbered bands on the camera view map your palm straight onto the board, with hysteresis so the piece doesn't jitter between columns
-- 🔁 **Self-calibrating wrist twist:** whatever angle you hold your hand at becomes "neutral", with a live dial gauge
-- 👌 **Robust pinch detection** that can't be confused with a fist
-- 🧩 **Proper puzzle rules:** 7-bag randomiser, wall kicks in both directions, ghost piece, hold, 3-piece preview, levels and speed-up
-- 🎵 **Synthesised audio:** an original chiptune loop that speeds up each level, plus sound effects, all generated with the Web Audio API (no audio files)
-- 🛠️ **Live debug panel (D):** every gesture value next to its threshold, plus the tracker's frame rate
-- ♿ **Left-handed mode (S)** and a **full keyboard fallback**
+- 🖐️ **Live skeleton overlays** on the camera view, so you can always see what the tracker sees
+- 🏠 **Hands-free navigation:** choose a game in the lobby with a fist, and use big hover buttons (**◀ ARCADE** / **PLAY ▶**) on every start, pause and game-over screen
+- 🎵 **Synthesised audio:** an original chiptune loop plus sound effects, generated with the Web Audio API (no audio files)
+- 🏆 **Best scores** saved in your browser and shown on each cabinet
+- 🛠️ **Debug panel (D)** in every game: each live gesture value next to its threshold
+- ⚡ **60 fps:** hand and pose tracking run in a background Web Worker, so the games never stutter
 - 💻 Fits a 1366×768 laptop screen
-
----
-
-## 📸 Screenshots
-
-| Start screen and gesture guide | Mid-game |
-|---|---|
-| <img src="docs/media/start-screen.png" alt="Start screen with illustrated guide to the six gestures"> | <img src="docs/media/gameplay.png" alt="Gameplay: board with ghost piece and SLAM flash, hold and next previews, score panel, camera view with column bands and controls reminder"> |
-
-| Debug panel (press D) |
-|---|
-| <img src="docs/media/debug-panel.png" alt="Debug panel listing every live gesture value next to its threshold, and the tracker running on GPU at 47 fps"> |
-
-| Keyboard demo (scripted, 11 s) |
-|---|
-| <img src="docs/media/demo.gif" alt="Hand Stack keyboard gameplay: pieces fall, line clears flash SINGLE, hold and next previews update" width="720"> |
-
-> **About these captures:** the screenshots above, the keyboard demo and its [full 42 s clip](docs/media/gameplay.mp4) were recorded in headless Chrome. The game was driven by scripted **keyboard** input, and the camera was a blank synthetic feed. That's why their camera panels show no hands. The GIF at the top and the [hand-tracking clip](docs/media/human_game.mp4) are real webcam play.
 
 ---
 
 ## 🚀 Quick start
 
-You need [Node.js](https://nodejs.org/) 20+, a webcam and an internet connection. The hand-tracking model loads from a CDN.
+You need [Node.js](https://nodejs.org/) 20+, a webcam and an internet connection (the tracking models load from a CDN).
 
 ```bash
 git clone https://github.com/Neev-Dhall/KCL-Hack.git
@@ -78,18 +57,55 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (usually **http://localhost:5173**) in **Google Chrome** and allow camera access. That's the arcade lobby: hold a fist over the Hand Stack cabinet (or click it). Hand Stack itself is at `/stack.html` and Hand Glide at `/glide.html`. In Hand Stack, **make a fist with your right hand** or press **Enter** to start.
+Open the URL Vite prints (usually **http://localhost:5173**) in **Google Chrome** and allow camera access. You'll land in the arcade.
 
-> 🔊 Sound and music start after your first click or key press, because browsers block audio until then.
-> 📷 If the camera is blocked, the game says so and carries on with the keyboard.
+To build a static site: `npm run build` writes everything to `dist/`, which works from any folder (for example GitHub Pages).
+
+> 📷 If the camera is blocked, each page says so and carries on with keyboard and mouse.
 
 ---
 
-## 🎮 Controls
+## 🏠 The arcade
 
-Left hand = **MOVE** hand (cyan). Right hand = **ACTION** hand (pink). Press **S** to swap them for left-handers.
+<img src="docs/media/arcade-lobby.png" alt="Hand Arcade lobby with three cabinets on a neon floor grid, each showing its best score" width="800">
 
-### Hands
+The lobby is a dark arcade room with a flickering marquee and three cabinets. Each cabinet screen loops a little attract-mode demo of its game and shows your best score.
+
+| To… | Hands | Keyboard / mouse |
+|---|---|---|
+| Choose a cabinet | Move your palm; a glowing cursor follows it | ← / → or hover |
+| Play it | Make a fist and hold it until the ring fills (0.6 s) | Enter or click |
+| Leave a game | Hover a hand over **◀ ARCADE** for 1 s on a menu screen | Esc |
+| Start / retry / resume | Hover a hand over **PLAY ▶** for 1 s | Each game's start key |
+
+Choosing a cabinet zooms the room into its screen and fades into the game.
+
+---
+
+## 🧱 Hand Stack
+
+**A falling-block puzzle you play with both hands.** Your **left hand** (cyan) steers the falling piece across the board and drops it faster. Your **right hand** (pink) rotates it, slams it down and puts it on hold.
+
+<img src="docs/media/hands-demo.gif" alt="A player controlling Hand Stack with both hands: cyan skeleton on the left hand picks the column band, pink skeleton on the right hand acts" width="720">
+
+**[▶ Watch the full hand-tracking clip (40 s)](docs/media/human_game.mp4)**
+
+| Start screen and gesture guide | Mid-game |
+|---|---|
+| <img src="docs/media/stack-start.png" alt="Hand Stack start screen with an illustrated guide to the six gestures"> | <img src="docs/media/stack-play.png" alt="Hand Stack mid-game: board, hold and next previews, score panel and controls reminder"> |
+
+<img src="docs/media/stack-demo.gif" alt="Hand Stack gameplay: pieces fall, rotate and lock, with hold and next previews updating" width="640">
+
+### Features
+
+- 🎯 **Column bands:** ten numbered bands on the camera view map your palm straight onto the board, with hysteresis so the piece doesn't jitter between columns
+- 🔁 **Self-calibrating wrist twist:** whatever angle you hold your hand at becomes "neutral", with a live dial gauge
+- 👌 **Robust pinch detection** that can't be confused with a fist
+- 🧩 **Proper puzzle rules:** 7-bag randomiser, wall kicks in both directions, ghost piece, hold, 3-piece preview, levels and speed-up
+- 🎵 The chiptune speeds up every level
+- ♿ **Left-handed mode (S)** swaps the hand roles
+
+### Controls
 
 | Hand | Gesture | Action |
 |---|---|---|
@@ -100,16 +116,14 @@ Left hand = **MOVE** hand (cyan). Right hand = **ACTION** hand (pink). Press **S
 | 👌 Right | Tap thumb and index together | **Hold** the piece |
 | ✊ Right | Close into a fist | **Slam** (hard drop); also starts the game |
 
-### Keyboard
-
 | Key | Action | Key | Action |
 |---|---|---|---|
 | ← → | Move | P | Pause |
 | ↓ | Soft drop | Enter | Start / restart |
 | ↑ or X | Rotate clockwise | S | Swap hand roles |
 | Z | Rotate anticlockwise | D | Debug panel |
-| Space | Hard drop | M | Mute (effects and music) |
-| C | Hold | | |
+| Space | Hard drop | M | Mute |
+| C | Hold | Esc | Back to the arcade |
 
 ### Scoring
 
@@ -123,26 +137,71 @@ Left hand = **MOVE** hand (cyan). Right hand = **ACTION** hand (pink). Press **S
 
 You go up a level every 10 lines. Gravity starts at 800 ms per row and gets 70 ms faster each level, down to a minimum of 80 ms.
 
+<details>
+<summary>🛠️ Debug panel (press D)</summary>
+
+<img src="docs/media/debug-panel.png" alt="Debug panel listing every live gesture value next to its threshold, and the tracker running on GPU">
+
+</details>
+
 ---
 
-## 🌠 Bonus game: Hand Glide
+## 🌠 Hand Glide
 
-A second arcade game using the same hand tracking. Steer a glowing comet through gaps in neon laser gates over a synthwave grid. It has three control modes (**T** cycles):
-
-- **WINGS mode (default): flap your arms like wings.** Stand back so your shoulders and hands are in view. Each downstroke flaps the comet, and raising your arms gets the next flap ready. This mode uses MediaPipe's **body pose** tracker (shoulders, elbows, wrists), which copes with fast arm movement much better than hand tracking.
-- **SQUEEZE mode:** squeeze either hand to flap. Quick half-squeezes count.
-- **STEER mode:** the comet follows your palm's height. Raise your hand to climb and lower it to dive. If your hand leaves the camera, gravity takes over.
-
-| Start | In flight |
-|---|---|
-| <img src="docs/media/glide-start.png" alt="Hand Glide start screen: comet over a striped synthwave sun, MAKE A FIST TO FLAP"> | <img src="docs/media/glide-play.png" alt="Hand Glide in flight: comet with trail between neon laser gates"> |
+**Fly a glowing comet through neon laser gates over a synthwave grid.** By default you play it with your whole body: stand back and **flap your arms like wings**.
 
 **[▶ Watch the Hand Glide demo](docs/media/glide_demo.mp4)**: real webcam play, flying the comet through the gates.
 
-- Open it from the **Hand Glide** cabinet in the arcade lobby, or go to `/glide.html`. On the start, pause and game-over screens, hover a hand over **◀ ARCADE** or **PLAY ▶** for a second to choose.
-- Keyboard and mouse work too: **Space**, **↑** or **click** to flap, **T** to switch mode, **P** to pause, **D** for the debug panel, **M** to mute.
-- The gaps get narrower and the scroll speed rises as your score climbs. From 10 gates, some gates **slide up and down**. Every 10 gates plays a jingle and speeds up the music.
-- Crashes shake the screen and burst into sparks. Each mode keeps its own best score in your browser.
+| Start | In flight |
+|---|---|
+| <img src="docs/media/glide-start.png" alt="Hand Glide start screen: comet over a striped synthwave sun, with ARCADE and PLAY hover buttons either side"> | <img src="docs/media/glide-play.png" alt="Hand Glide in flight: comet with trail approaching a pair of neon gates"> |
+
+### Three control modes (T cycles)
+
+- **WINGS (default): flap your arms.** Keep your shoulders and hands in view. Each downstroke flaps the comet, and raising your arms readies the next flap. This mode uses MediaPipe's **body pose** tracker (shoulders, elbows, wrists), which copes with fast arm movement much better than hand tracking.
+- **SQUEEZE:** squeeze either hand to flap. Quick half-squeezes count.
+- **STEER:** the comet follows your palm's height. Raise your hand to climb and lower it to dive. If your hand leaves the camera, gravity takes over.
+
+### How it plays
+
+- The gaps get narrower and the scroll speed rises as your score climbs. From 10 gates, some gates **slide up and down**.
+- Every 10 gates plays a jingle and speeds up the music.
+- Crashes shake the screen and burst into sparks. Each mode keeps its own best score.
+- Keyboard and mouse: **Space**, **↑** or **click** to flap, **T** to switch mode, **P** to pause, **D** debug, **M** mute, **Esc** back to the arcade.
+
+---
+
+## 🔨 Hand Whack
+
+**Bop the neon moles before they duck back down.** Each of your hands is a hammer: move your palm to aim at one of nine holes, then **squeeze your hand** to whack. Two hands means two hammers.
+
+<img src="docs/media/whack-demo.gif" alt="Hand Whack gameplay: two hammers (cyan and pink) aim at the 3×3 grid of holes, moles pop up and get bopped with score pop-ups, the camera view shows the aiming grid" width="600">
+
+| Start | Mid-game | Time's up |
+|---|---|---|
+| <img src="docs/media/whack-start.png" alt="Hand Whack start screen explaining aim and squeeze controls"> | <img src="docs/media/whack-play.png" alt="Hand Whack mid-game: a mole pops out while both hammers aim at holes"> | <img src="docs/media/whack-over.png" alt="Hand Whack results screen with score, best and hit rate"> |
+
+### How it plays
+
+- **60-second rounds.** Moles pop up faster, stay up for less time and appear in greater numbers as the clock runs down.
+- 👑 **Golden moles** are quick and worth **+50**.
+- 💣 **Bombs** appear after 10 seconds. Whack one and you lose **5 seconds**.
+- 🔥 **Combos:** every 5 hits in a row raises your multiplier, up to **×5**. A miss, a whiff or a mole that escapes resets it.
+- The camera view shows a 3×3 aiming grid, so you can see which hole each hand is pointing at. The aimed hole glows in that hammer's colour.
+
+### Controls
+
+| Hand | Gesture | Action |
+|---|---|---|
+| ✋ Either | Move your palm | Aim the hammer at a hole |
+| ✊ Either | Squeeze (a quick fist), then open again | Whack; also starts the game |
+
+| Key | Action | Key | Action |
+|---|---|---|---|
+| 1–9 | Whack a hole (top row = 1 2 3) | P | Pause |
+| Numpad | Whack a hole (numpad layout) | D | Debug panel |
+| Click | Whack the nearest hole | M | Mute |
+| Space / Enter | Start / retry | Esc | Back to the arcade |
 
 ---
 
@@ -150,55 +209,65 @@ A second arcade game using the same hand tracking. Steer a glowing comet through
 
 ```mermaid
 flowchart LR
-    CAM[📷 Webcam] --> MP["MediaPipe HandLandmarker<br/>21 landmarks × 2 hands<br/>(GPU, CPU fallback)"]
-    MP --> ROLES["Assign roles<br/>left on screen = MOVE<br/>right on screen = ACTION"]
-    ROLES --> MEAS["Measure in palm lengths<br/>finger extension · curl<br/>pinch gap · knuckle angle"]
-    MEAS --> GEST["Gesture state machines<br/>hysteresis · arming<br/>cooldowns · motion guard"]
-    GEST -->|"moveTo · rotate · hold<br/>hardDrop · setSoftDrop"| GAME["game.js<br/>rules + canvas renderer"]
-    KEYS[⌨️ Keyboard] --> GAME
-    GAME -->|events| SND["sound.js<br/>SFX + chiptune"]
+    CAM[📷 Webcam] --> W["Web Worker<br/>MediaPipe Hand + Pose<br/>(GPU, CPU fallback)"]
+    W --> MEAS["Measure in palm lengths<br/>curl · pinch gap · twist angle<br/>arm height"]
+    MEAS --> GEST["Gesture detectors<br/>hysteresis · arming<br/>cooldowns · motion guard"]
+    GEST --> STACK["🧱 Hand Stack"]
+    GEST --> GLIDE["🌠 Hand Glide"]
+    GEST --> WHACK["🔨 Hand Whack"]
+    GEST --> MENU["🏠 Lobby + hand menus"]
+    KEYS[⌨️ Keyboard / mouse] --> STACK & GLIDE & WHACK & MENU
+    STACK & GLIDE & WHACK --> SND["sound.js<br/>SFX + chiptune"]
 ```
 
-The code is split so each file has one job, and the hand code can only reach the game through its public API:
+Each page is its own Vite entry, and the games share the tracking, sound and menu code:
 
 | File | Job |
 |---|---|
-| [`src/game.js`](src/game.js) | Game rules and drawing only: board, 7-bag randomiser, wall kicks, scoring, levels, the neon canvas renderer and CRT scanlines. It knows nothing about cameras. |
-| [`src/hands.js`](src/hands.js) | Camera, MediaPipe hand tracking and gesture detection. It only calls the API that `game.js` exports. **Every gesture threshold is in one commented block at the top of the file.** |
+| [`index.html`](index.html) + [`src/arcade.js`](src/arcade.js) + [`src/arcade.css`](src/arcade.css) | The lobby: CSS cabinets, attract-mode demos, hand cursor and fist-to-select, zoom transition. |
+| [`stack.html`](stack.html) + [`src/main.js`](src/main.js) | Hand Stack page: keyboard, sound, music, screens and the game loop. |
+| [`src/game.js`](src/game.js) | Hand Stack rules and drawing only: board, 7-bag randomiser, wall kicks, scoring, levels and the neon renderer. It knows nothing about cameras. |
+| [`src/hands.js`](src/hands.js) | Hand Stack's gesture detection. It only calls the API that `game.js` exports. **Every gesture threshold is in one commented block at the top.** |
+| [`glide.html`](glide.html) + [`src/glide.js`](src/glide.js) | Hand Glide: physics, gates, drawing and the three control modes, with all tuning numbers at the top. |
+| [`whack.html`](whack.html) + [`src/whack.js`](src/whack.js) | Hand Whack: moles, hammers, combos and the squeeze detector, with all tuning numbers at the top. |
+| [`src/handmenu.js`](src/handmenu.js) | The hover-to-select **◀ ARCADE / PLAY ▶** buttons used on every game's menu screens. |
+| [`src/tracker.js`](src/tracker.js) | Shared webcam + MediaPipe setup: hand tracking, plus body-pose tracking loaded on demand. |
+| [`src/vision.js`](src/vision.js) + [`src/vision.worker.js`](src/vision.worker.js) | Runs MediaPipe in a **Web Worker**. Camera frames are handed over without copying, and frames that arrive while the worker is busy are skipped, so tracking never freezes a game or builds up lag. |
 | [`src/sound.js`](src/sound.js) | Sound effects and an original 4-bar chiptune loop (Am–F–C–G), played by a small step sequencer on the Web Audio clock. |
-| [`src/main.js`](src/main.js) | Wires it all together: keyboard, sound, music, screens and the game loop. |
-| [`src/glide.js`](src/glide.js) + [`glide.html`](glide.html) | Hand Glide: physics, gates, drawing and fist-to-flap, with all tuning numbers at the top. |
-| [`src/vision.js`](src/vision.js) + [`src/vision.worker.js`](src/vision.worker.js) | Runs MediaPipe in a **Web Worker** (a background thread) for both games. Camera frames are sent over as ImageBitmaps, and frames that arrive while the worker is busy are skipped, so tracking never freezes the game or builds up lag. |
-| [`src/tracker.js`](src/tracker.js) | Shared webcam + MediaPipe setup for Hand Glide: hand tracking, plus body-pose tracking for wing flapping (loaded on demand). |
-| [`vite.config.js`](vite.config.js) | Builds both pages. |
+| [`vite.config.js`](vite.config.js) | Builds all four pages. |
 
 ### Gesture tricks
 
-- **Scale-free:** every distance is measured in *palm lengths* (wrist to the middle-finger knuckle). Gestures work the same close to the camera or far away.
+- **Scale-free:** every distance is measured in *palm lengths* (wrist to the middle-finger knuckle), so gestures work the same close to the camera or far away.
 - **Hysteresis everywhere:** columns, fists and pinches each have separate "on" and "off" thresholds, so nothing flickers at the edge.
-- **Self-calibrating twist:** the angle you first raise your hand at becomes neutral, and neutral slowly follows your hand while it rests. A 10° turn left rotates once. You come back to centre to re-arm, and turning right never triggers anything, so wobbling back can't double-rotate.
-- **Pinch vs fist:** a pinch is an "OK sign": thumb and index touching while the other three fingers stay straight. It has to *start* from an open thumb and hold for 2 frames. A fist curls those fingers, so closing or opening a fist can never count as a pinch.
-- **Never blocks the game:** hand and pose tracking run in a background Web Worker. Both games hold a steady 60 fps while tracking runs at the camera's ~30 fps.
-- **Motion guard:** after a slam or hold, the action hand is ignored for 600 ms. Twists don't count while the hand is moving fast or mid-pinch.
+- **Squeeze = a drop, not a threshold:** Hand Glide and Hand Whack detect a squeeze as your finger curl *dropping* from its recent high, so quick half-squeezes count, and the hand must open again before the next one.
+- **Aim lock:** closing your hand shifts your palm slightly, so the lobby cursor and Whack's hammer hold their target while the fist is forming.
+- **Self-calibrating twist:** in Hand Stack, the angle you first raise your hand at becomes neutral, and neutral slowly follows your hand while it rests.
+- **Pinch vs fist:** a pinch is an "OK sign" that has to *start* from an open thumb and hold for 2 frames, so closing or opening a fist never counts as a pinch.
+- **Menus can't misfire:** a hover button won't fire if a hand was already resting on it when the menu appeared. You have to move off and come back.
 
 ### Tuning
 
-All thresholds live at the top of [`src/hands.js`](src/hands.js). Press **D** in game to see each live value next to its threshold, so you can tune a gesture by watching the numbers.
+Every threshold lives in a commented block at the top of its file. Press **D** in any game to watch each live value next to its threshold.
 
 | Gesture | Key values |
 |---|---|
-| Column bands | 5–47% of frame width · switch 0.2 of a band past the edge |
-| Fist (soft drop / slam) | curl < 1.05 on · > 1.4 off / re-arm |
-| Pinch | gap < 0.45 · arm > 0.6 · other fingers avg > 1.15 · 2 frames |
-| Twist | 10° left fires · ±4° re-arms · EMA α 0.5 · `TWIST_SIGN` flips direction |
-| Motion guard | > 0.5 palm lengths in 250 ms · 600 ms cooldown |
+| Stack column bands | 5–47% of frame width · switch 0.2 of a band past the edge |
+| Stack fist (soft drop / slam) | curl < 1.05 on · > 1.4 off / re-arm |
+| Stack pinch | gap < 0.45 · arm > 0.6 · other fingers avg > 1.15 · 2 frames |
+| Stack twist | 10° left fires · ±4° re-arms · EMA α 0.5 |
+| Glide wings | arms drop 0.6 shoulder-widths → flap · rise 0.3 → ready |
+| Glide / Whack squeeze | curl drops 0.35 → fire · rises 0.2 → ready |
+| Whack aiming box | 18–82% of frame width · 20–80% of height |
+| Lobby fist | curl < 1.15 held 0.6 s · open > 1.35 first |
+| Hand menu | 1 s hover |
 
 ---
 
 ## 🧰 Tech
 
 - **Plain JavaScript, HTML canvas and CSS**, served with **Vite**. No frameworks.
-- **[MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker)** `HandLandmarker` (`float16` model, `VIDEO` mode, 2 hands), loaded from jsDelivr.
+- **[MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker)**: `HandLandmarker` (2 hands) and `PoseLandmarker` (lite), in `VIDEO` mode inside a Web Worker, loaded from jsDelivr.
 - **Web Audio API** for every sound and the music.
 - **[Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P)** from Google Fonts.
 
