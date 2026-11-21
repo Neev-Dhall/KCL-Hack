@@ -76,17 +76,21 @@ export function createHandMenu(items) {
 
   return {
     feed(points, now = performance.now()) {
-      // Keep cursor identity stable: sort left to right.
-      const sorted = [...points].sort((a, b) => a.x - b.x).slice(0, 2);
-      sorted.forEach((p, i) => {
-        const c = cursors[i];
-        const tx = toPage(p.x, innerWidth);
-        const ty = toPage(p.y, innerHeight);
+      // Keep cursor identity stable: each point goes to the nearest live
+      // cursor, so when one hand leaves, the other cursor doesn't jump.
+      const targets = points.slice(0, 2).map((p) => ({ tx: toPage(p.x, innerWidth), ty: toPage(p.y, innerHeight) }));
+      const isLive = (c) => now - c.seen <= LOST_MS && c.x !== null;
+      const cost = (c, t) => (isLive(c) ? Math.hypot(c.x - t.tx, c.y - t.ty) : 1e6); // prefer live cursors
+      // Try both pairings of (up to) two points with the two cursors; keep the cheaper.
+      const pairings = [[0, 1], [1, 0]].map((order) => targets.map((t, k) => [cursors[order[k]], t]));
+      const total = (pairs) => pairs.reduce((sum, [c, t]) => sum + cost(c, t), 0);
+      const best = total(pairings[0]) <= total(pairings[1]) ? pairings[0] : pairings[1];
+      for (const [c, { tx, ty }] of best) {
         const fresh = now - c.seen > LOST_MS || c.x === null;
         c.x = fresh ? tx : c.x + SMOOTH * (tx - c.x);
         c.y = fresh ? ty : c.y + SMOOTH * (ty - c.y);
         c.seen = now;
-      });
+      }
     },
 
     frame(now, visible) {

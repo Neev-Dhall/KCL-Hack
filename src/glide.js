@@ -39,7 +39,15 @@ const SHAKE_MS = 350; // screen shake after a crash
 // height dropping from its recent high; raising your arms again re-arms it.
 const WING_DROP = 0.45; // arms fall this far (shoulder-widths) below their recent high → flap
 const WING_RISE = 0.3; // arms rise this far above their recent low → ready again
-const POSE_VISIBLE = 0.5; // a shoulder / wrist counts as seen above this visibility
+const POSE_VISIBLE = 0.5; // a shoulder counts as seen above this visibility
+// A wrist near the frame edge (e.g. one arm stretched out) flickers in and out
+// of view. Each wrist has hysteresis, holds its last height briefly when lost,
+// and an arm appearing / disappearing re-bases the flap detector instead of
+// looking like a downstroke.
+const WRIST_ON = 0.5; // a lost wrist counts as seen again above this visibility…
+const WRIST_OFF = 0.3; // …and a seen wrist is only lost below this
+const ARM_HOLD_MS = 400; // keep a lost wrist's last height this long
+const ARM_SMOOTH = 0.6; // EMA weight for each wrist's newest height (1 = no smoothing)
 
 // SQUEEZE mode: curl = avg fingertip→wrist distance in palm lengths. A flap is
 // curl dropping from its recent high, so quick half-squeezes count.
@@ -92,6 +100,8 @@ let latestHands = [];
 let latestPose = null; // { landmarks, pts } or null when nobody is in view
 let armsHeight = null; // wrists above shoulders, in shoulder-widths
 let wing = newDetector(); // downstroke detector for WINGS mode
+const arms = { 15: newArm(), 16: newArm() }; // per-wrist tracking (pose landmarks 15 = left wrist, 16 = right)
+let armSet = ''; // which wrists currently feed armsHeight, e.g. '15,16'
 // Per screen side: squeeze detectors for SQUEEZE mode — see updateDetector().
 const sides = { left: newDetector(), right: newDetector() };
 let steerHand = null; // the hand currently steering (STEER mode)
@@ -303,22 +313,9 @@ function updatePose() {
   const now = performance.now();
   countFps(now);
   latestPose = pose.landmarks ? pose : null;
-  // Wrists drive the menu cursors in WINGS mode.
-  menu.feed(latestPose ? [15, 16].filter((i) => (pose.landmarks[i].visibility ?? 1) > 0.5).map((i) => ({ x: 1 - pose.landmarks[i].x, y: pose.landmarks[i].y })) : []);
-
-  // Arm height: wrists above the shoulder line, in shoulder-widths.
-  armsHeight = null;
-  if (latestPose) {
-    const p = latestPose.pts;
-    const seen = (i) => p[i].visibility > POSE_VISIBLE;
-    const shoulderW = dist(p[11], p[12]);
-    const wrists = [15, 16].filter(seen);
-    if (seen(11) && seen(12) && shoulderW > 0.02 && wrists.length) {
-      const shoulderY = (p[11].y + p[12].y) / 2;
-      const wristY = wrists.reduce((sum, i) => sum + p[i].y, 0) / wrists.length;
-      armsHeight = (shoulderY - wristY) / shoulderW;
-    }
-  }
+  armsHeight = measureArms(latestPose, now);
+  // Wrists drive the menu cursors in WINGS mode (using the steadied wrists).
+  menu.feed(latestPose ? [15, 16].filter((i) => arms[i].seen).map((i) => ({ x: 1 - latestPose.landmarks[i].x, y: latestPose.landmarks[i].y })) : []);
 
   if (armsHeight === null) {
     wing = newDetector(); // start fresh when the arms come back into view
@@ -338,6 +335,55 @@ function updatePose() {
 
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function newArm() {
+  return { seen: false, h: null, lastSeen: -Infinity };
+}
+
+// Arm height: wrists above the shoulder line, in shoulder-widths, averaged
+// over the arms in view. Returns null when shoulders or both arms are missing.
+function measureArms(pose, now) {
+  const p = pose?.pts;
+  const shouldersOk = p && p[11].visibility > POSE_VISIBLE && p[12].visibility > POSE_VISIBLE && dist(p[11], p[12]) > 0.02;
+  if (!shouldersOk) {
+    arms[15] = newArm();
+    arms[16] = newArm();
+    armSet = '';
+    return null;
+  }
+  const shoulderW = dist(p[11], p[12]);
+  const shoulderY = (p[11].y + p[12].y) / 2;
+
+  for (const i of [15, 16]) {
+    const arm = arms[i];
+    const vis = p[i].visibility;
+    arm.seen = arm.seen ? vis > WRIST_OFF : vis > WRIST_ON;
+    if (arm.seen) {
+      const raw = (shoulderY - p[i].y) / shoulderW;
+      arm.h = arm.h === null ? raw : arm.h + ARM_SMOOTH * (raw - arm.h);
+      arm.lastSeen = now;
+    } else if (now - arm.lastSeen > ARM_HOLD_MS) {
+      arm.h = null; // gone for a while: stop counting this arm
+    }
+  }
+
+  const active = [15, 16].filter((i) => arms[i].h !== null);
+  if (!active.length) {
+    armSet = '';
+    return null;
+  }
+  const height = active.reduce((sum, i) => sum + arms[i].h, 0) / active.length;
+
+  // An arm joining or leaving changes the average by itself; re-base the
+  // detector there so that jump can't count as a flap.
+  const set = active.join(',');
+  if (set !== armSet && wing.high !== null) {
+    wing.high = wing.low = height;
+    wing.value = height;
+  }
+  armSet = set;
+  return height;
 }
 
 // ---------- SQUEEZE + STEER: hands ----------
@@ -849,3 +895,6 @@ function loop(now) {
 }
 
 requestAnimationFrame(loop);
+
+// For testing in the console: feed fake poses through the wing tracking.
+window.handGlideDebug = { measureArms, updateDetector, get wing() { return wing; }, set wing(w) { wing = w; }, arms, WING_DROP, WING_RISE };
