@@ -23,9 +23,11 @@ const FIST_OFF_CURL = 1.4; // curl above this → soft drop off
 // --- Action hand: wrist twist = rotate ---
 const TWIST_SIGN = 1; // set to -1 if twisting rotates the wrong way
 const TWIST_SMOOTHING = 0.5; // EMA alpha for the knuckle-line angle (1 = no smoothing)
-const TWIST_TRIGGER_DEG = 35; // turn this far from neutral to rotate once
-const TWIST_REARM_DEG = 15; // come back within this to allow the next twist
-const NEUTRAL_DRIFT = 0.02; // inside the re-arm zone, neutral moves 2%/frame toward the hand
+const TWIST_TRIGGER_DEG = 15; // while pinching, turn this far to rotate once
+// Twisting only counts while thumb + index are pinched (a "clutch"), using
+// PINCH_ON / PINCH_OFF / PINKY_OPEN below. Release the pinch to bring your
+// hand back to normal without rotating. Keep twisting while pinched to
+// rotate again: each rotation re-zeroes the dial ("ratchet").
 
 // --- Action hand: pinch backup mode (T key) ---
 const PINCH_ON = 0.45; // thumb tip within this of index tip (↻) or middle tip (↺)
@@ -81,9 +83,9 @@ let fist = false; // soft drop currently on because of a fist
 // Action-hand gesture state.
 let twistMode = true; // T key toggles: true = wrist twist, false = pinch
 let twistAngle = null; // smoothed knuckle-line angle in degrees (null = hand not seen)
-let neutralAngle = null; // the hand's "resting" angle
+let neutralAngle = null; // the angle when the pinch started (or after the last rotation)
 let twistDelta = 0; // current angle relative to neutral
-let twistArmed = true; // false after a twist, until the hand comes back to neutral
+let twistGrip = false; // true while thumb + index are pinched (twisting counts)
 let pinchCW = false; // thumb+index currently pinched
 let pinchCCW = false; // thumb+middle currently pinched
 let pinchIndexGap = 0; // latest pinch distances (shown in the status / debug)
@@ -168,7 +170,7 @@ export function toggleDebug() {
 export function toggleTwistMode() {
   twistMode = !twistMode;
   pinchCW = pinchCCW = false;
-  twistArmed = true;
+  twistGrip = false;
 }
 
 // ---------- Per-frame update (called from the game loop) ----------
@@ -267,7 +269,7 @@ function updateActionHand(now) {
     // Forget everything so the next time the hand appears it starts fresh.
     twistAngle = neutralAngle = null;
     twistDelta = 0;
-    twistArmed = true;
+    twistGrip = false;
     pinchCW = pinchCCW = false;
     palmHistory = [];
     slamDrop = handMotion = 0;
@@ -344,35 +346,33 @@ function updateTwist(hand, suppressed) {
   const b = hand.pts[17];
   const raw = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
 
-  if (twistAngle === null) {
-    // Hand just appeared: its current angle becomes neutral.
-    twistAngle = raw;
-    neutralAngle = raw;
-  } else {
-    twistAngle += TWIST_SMOOTHING * wrapDeg(raw - twistAngle);
+  twistAngle = twistAngle === null ? raw : twistAngle + TWIST_SMOOTHING * wrapDeg(raw - twistAngle);
+
+  // Clutch: thumb + index pinch, with the pinky open so a fist doesn't count.
+  const p = hand.pts;
+  pinchIndexGap = dist(p[4], p[8]) / hand.palm;
+  const pinkyOpen = dist(p[20], p[0]) / hand.palm > PINKY_OPEN;
+  if (!twistGrip && pinkyOpen && pinchIndexGap < PINCH_ON) {
+    twistGrip = true;
+    neutralAngle = twistAngle; // the dial starts at zero when you pinch
+  } else if (twistGrip && pinchIndexGap > PINCH_OFF) {
+    twistGrip = false; // released: the hand can return to normal freely
   }
 
-  if (suppressed) {
-    // Keep neutral glued to the hand, so whatever angle the hand ends up at
-    // after a swipe becomes the new neutral (no surprise rotation).
+  if (!twistGrip || suppressed) {
+    // Not gripping (or mid-swipe): keep the dial at zero.
     neutralAngle = twistAngle;
     twistDelta = 0;
-    twistArmed = true;
     return;
   }
 
   twistDelta = wrapDeg(twistAngle - neutralAngle) * TWIST_SIGN;
-
-  if (Math.abs(twistDelta) <= TWIST_REARM_DEG) {
-    // Resting near neutral: re-arm, and let neutral slowly follow the hand.
-    twistArmed = true;
-    neutralAngle += NEUTRAL_DRIFT * wrapDeg(twistAngle - neutralAngle);
-  } else if (twistArmed && twistDelta >= TWIST_TRIGGER_DEG) {
-    twistArmed = false;
+  if (twistDelta >= TWIST_TRIGGER_DEG) {
     game.rotate(1); // clockwise
-  } else if (twistArmed && twistDelta <= -TWIST_TRIGGER_DEG) {
-    twistArmed = false;
+    neutralAngle = twistAngle; // ratchet: twist another step to rotate again
+  } else if (twistDelta <= -TWIST_TRIGGER_DEG) {
     game.rotate(-1); // anticlockwise
+    neutralAngle = twistAngle;
   }
 }
 
@@ -486,13 +486,13 @@ function drawDial() {
     return;
   }
 
-  // Re-arm zone.
-  octx.fillStyle = 'rgba(0, 255, 163, 0.25)';
-  octx.beginPath();
-  octx.moveTo(cx, cy);
-  octx.arc(cx, cy, r, rad(-TWIST_REARM_DEG), rad(TWIST_REARM_DEG));
-  octx.closePath();
-  octx.fill();
+  // Dial fills green while the pinch "clutch" is gripped.
+  if (twistGrip) {
+    octx.fillStyle = 'rgba(0, 255, 163, 0.25)';
+    octx.beginPath();
+    octx.arc(cx, cy, r, 0, Math.PI * 2);
+    octx.fill();
+  }
 
   // Dial ring.
   octx.strokeStyle = 'rgba(255, 43, 214, 0.5)';
@@ -512,10 +512,10 @@ function drawDial() {
     octx.stroke();
   }
 
-  // Needle (grey while waiting to re-arm, hidden when no action hand).
+  // Needle (grey until you pinch, hidden when no action hand).
   if (twistAngle !== null) {
     const a = rad(Math.max(-90, Math.min(90, twistDelta)));
-    octx.strokeStyle = twistArmed ? '#ffffff' : '#7a7f99';
+    octx.strokeStyle = twistGrip ? '#ffffff' : '#7a7f99';
     octx.lineWidth = 2;
     octx.beginPath();
     octx.moveTo(cx, cy);
@@ -589,7 +589,7 @@ function updateStatus() {
     `<div class="${cls}">${name} (${side}): ${hand ? 'TRACKING · curl ' + hand.curl.toFixed(2) + extra : 'not seen'}</div>`;
   const moveExtra = column === null ? '' : ` · COL ${column + 1}${fist ? ' · FIST' : ''}`;
   let actionExtra = twistMode
-    ? ` · TWIST ${twistDelta >= 0 ? '+' : ''}${Math.round(twistDelta)}°${twistArmed ? '' : ' (re-arm)'}`
+    ? ` · TWIST ${twistDelta >= 0 ? '+' : ''}${Math.round(twistDelta)}°${twistGrip ? ' (GRIP)' : ' (pinch to twist)'}`
     : ` · PINCH ${pinchIndexGap.toFixed(2)}/${pinchMiddleGap.toFixed(2)}`;
   const now = performance.now();
   const motionNote = isCoolingDown(now) ? ' · COOLDOWN' : handMotion > FAST_MOVE_DISTANCE ? ' · MOVING' : '';
@@ -617,10 +617,11 @@ function renderDebug(now) {
     ['column pos', mv ? n(columnPos) : '—', `±${COLUMN_HYSTERESIS} past edge`, false],
     ['curl (fist)', mv ? n(mv.curl) : '—', `on <${FIST_ON_CURL} · off >${FIST_OFF_CURL}`, fist],
     ['— ACTION HAND', '', '', false],
-    ['twist °', twistMode && ac ? n(twistDelta, 0) : '—', `±${TWIST_TRIGGER_DEG} fire · ±${TWIST_REARM_DEG} re-arm`, twistMode && !twistArmed],
+    ['twist °', twistMode && ac ? n(twistDelta, 0) : '—', `±${TWIST_TRIGGER_DEG} while pinched`, twistGrip],
+    ['grip gap', twistMode && ac ? n(pinchIndexGap) : '—', `on <${PINCH_ON} · off >${PINCH_OFF}`, twistGrip],
     ['pinch idx', !twistMode && ac ? n(pinchIndexGap) : '—', `on <${PINCH_ON} · off >${PINCH_OFF}`, pinchCW],
     ['pinch mid', !twistMode && ac ? n(pinchMiddleGap) : '—', `on <${PINCH_ON} · off >${PINCH_OFF}`, pinchCCW],
-    ['pinky open', !twistMode && ac ? n(dist(ac.pts[20], ac.pts[0]) / ac.palm) : '—', `>${PINKY_OPEN}`, false],
+    ['pinky open', ac ? n(dist(ac.pts[20], ac.pts[0]) / ac.palm) : '—', `>${PINKY_OPEN}`, false],
     ['slam drop', ac ? n(slamDrop) : '—', `≥${SLAM_DISTANCE} in ${SLAM_WINDOW_MS}ms`, cooldownLeft > 0],
     ['motion', ac ? n(handMotion) : '—', `>${FAST_MOVE_DISTANCE} blocks`, handMotion > FAST_MOVE_DISTANCE],
     ['cooldown ms', n(cooldownLeft, 0), `${SLAM_COOLDOWN_MS}`, cooldownLeft > 0],
