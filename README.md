@@ -63,7 +63,7 @@ Sound and music start after your first click or key press, because browsers bloc
 - **Scale-free:** every distance is measured in *palm lengths* (wrist to the middle-finger knuckle), so gestures work whether you're near the camera or far from it.
 - **Hysteresis everywhere:** columns, fists and pinches all use separate "on" and "off" thresholds, so they don't flicker at the edge.
 - **Self-calibrating twist:** the angle you first raise your hand at becomes neutral, and neutral slowly drifts to follow you while you're resting. A 10° turn to the left rotates the piece anticlockwise. You have to come back to centre before the next twist counts, and turning right never triggers anything, so wobbling back can't cause a double rotation.
-- **Gesture guard:** after a slam or a hold, the right hand's gestures are ignored for 600 ms. Twists also don't count while the hand is moving fast or mid-pinch, so tapping for hold can't accidentally rotate the piece. A pinch only counts while the pinky is open, so closing your hand for a slam is never mistaken for a hold.
+- **Gesture guard:** after a slam or a hold, the right hand's gestures are ignored for 600 ms. Twists also don't count while the hand is moving fast or mid-pinch, so tapping for hold can't accidentally rotate the piece. A pinch is an "OK sign" (thumb and index touching, other three fingers straight), and it must start from an open thumb. A fist curls those fingers, so closing or opening a fist is never mistaken for a pinch.
 
 Press **D** in game to see every live gesture value next to its threshold.
 

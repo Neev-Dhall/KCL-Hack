@@ -32,9 +32,14 @@ const NEUTRAL_DRIFT = 0.02; // inside the re-arm zone, neutral moves 2%/frame to
 
 // --- Thumb + index pinch tap (both hands) ---
 // Left hand pinch = rotate clockwise. Right hand pinch = hold.
+// A pinch is an "OK sign": thumb + index tips touching while the middle,
+// ring and pinky stay straight. A fist curls those three, so the two can't
+// be confused. It must also start from an open thumb, so opening out of a
+// fist (thumb already against the index) can't fire a pinch.
 const PINCH_ON = 0.45; // thumb tip within this of the index tip = pinch
-const PINCH_OFF = 0.6; // gap must open above this before the next pinch counts
-const PINKY_OPEN = 1.0; // pinky tip must be this far from the wrist (so a fist isn't a pinch)
+const PINCH_OFF = 0.6; // gap must open above this (fingers straight) to arm the next pinch
+const PINCH_OTHERS_OUT = 1.3; // middle, ring + pinky tips at least this far from the wrist
+const PINCH_CONFIRM_FRAMES = 2; // pinch must be seen this many frames in a row
 
 // --- Action hand: fast-movement guard ---
 const MOTION_WINDOW_MS = 250; // how much palm-position history we keep
@@ -81,16 +86,14 @@ let actionHand = null;
 // Move-hand gesture state.
 let column = null; // board column the palm is over (null = hand not seen)
 let fist = false; // soft drop currently on because of a fist
-let movePinched = false; // left thumb + index currently pinched
-let movePinchGap = 0; // latest left thumb-tip → index-tip distance (palm lengths)
+const leftPinch = newPinch(); // pinch detector for the move hand (see pinchTapped)
 
 // Action-hand gesture state.
 let twistAngle = null; // smoothed knuckle-line angle in degrees (null = hand not seen)
 let neutralAngle = null; // the hand's "resting" angle
 let twistDelta = 0; // current angle relative to neutral (negative = turned left)
 let twistArmed = true; // false after a twist, until the hand comes back to neutral
-let pinched = false; // thumb + index currently pinched
-let pinchGap = 0; // latest thumb-tip → index-tip distance (palm lengths)
+const rightPinch = newPinch(); // pinch detector for the action hand
 let palmHistory = []; // recent palm-centre positions: { t, x, y }
 let handMotion = 0; // biggest palm movement in any direction in the window
 let slamArmed = false; // true once the hand has been seen open (re-armed by opening again)
@@ -222,7 +225,7 @@ function columnArea() {
 function updateMoveHand() {
   if (!moveHand) {
     column = null;
-    movePinched = false;
+    Object.assign(leftPinch, newPinch());
     if (fist) {
       fist = false;
       game.setSoftDrop(false);
@@ -231,13 +234,7 @@ function updateMoveHand() {
   }
 
   // Pinch = rotate clockwise (one rotation per tap).
-  movePinchGap = dist(moveHand.pts[4], moveHand.pts[8]) / moveHand.palm;
-  if (movePinched && movePinchGap > PINCH_OFF) {
-    movePinched = false; // fingers apart again: ready for the next tap
-  } else if (!movePinched && movePinchGap < PINCH_ON && moveHand.fingers.pinky > PINKY_OPEN) {
-    movePinched = true;
-    game.rotate(1);
-  }
+  if (pinchTapped(leftPinch, moveHand, false)) game.rotate(1);
 
   // Palm position measured in columns, e.g. 3.6 = 60% of the way across band 3.
   const { start, end } = columnArea();
@@ -250,7 +247,7 @@ function updateMoveHand() {
   // The column is frozen mid-pinch so the tap can't nudge the piece sideways.
   const outsideCurrent =
     column === null || pos < column - COLUMN_HYSTERESIS || pos > column + 1 + COLUMN_HYSTERESIS;
-  if (outsideCurrent && !movePinched) {
+  if (outsideCurrent && !leftPinch.near) {
     const newColumn = clamp(Math.floor(pos));
     if (newColumn !== column) {
       column = newColumn;
@@ -275,7 +272,7 @@ function updateActionHand(now) {
     twistAngle = neutralAngle = null;
     twistDelta = 0;
     twistArmed = true;
-    pinched = false;
+    Object.assign(rightPinch, newPinch());
     palmHistory = [];
     handMotion = 0;
     slamArmed = false;
@@ -287,10 +284,13 @@ function updateActionHand(now) {
   const moving = handMotion > FAST_MOVE_DISTANCE;
 
   updateSlam(actionHand, now, cooling);
-  updatePinch(actionHand, now, cooling || moving);
+  if (pinchTapped(rightPinch, actionHand, cooling || moving)) {
+    game.hold();
+    startCooldown(now, 'HOLD!');
+  }
   // Twists don't count during the cooldown, while moving fast, or mid-pinch
   // (so tapping thumb and index can't nudge the dial into a rotation).
-  updateTwist(actionHand, cooling || moving || pinched);
+  updateTwist(actionHand, cooling || moving || rightPinch.near);
 }
 
 function isCoolingDown(now) {
@@ -330,20 +330,49 @@ function updateSlam(hand, now, cooling) {
   }
 }
 
-// ---------- Action hand: thumb + index pinch tap = hold ----------
-function updatePinch(hand, now, blocked) {
-  pinchGap = dist(hand.pts[4], hand.pts[8]) / hand.palm;
+// ---------- Pinch tap detector (shared by both hands) ----------
+function newPinch() {
+  return {
+    gap: 0, // thumb tip → index tip (palm lengths)
+    othersOut: false, // middle, ring + pinky all straight
+    near: false, // thumb closing on the index with the other fingers straight
+    armed: false, // seen open (gap > PINCH_OFF, fingers straight) since the last pinch
+    frames: 0, // consecutive frames that look like a pinch
+    down: false, // currently pinched (waiting for the fingers to open again)
+  };
+}
 
-  if (pinched) {
-    if (pinchGap > PINCH_OFF) pinched = false; // fingers apart again: ready for the next tap
-    return;
+// Returns true once per pinch tap. blocked = true swallows the tap (cooldown etc.).
+function pinchTapped(p, hand, blocked) {
+  const f = hand.fingers;
+  p.gap = dist(hand.pts[4], hand.pts[8]) / hand.palm;
+  p.othersOut = Math.min(f.middle, f.ring, f.pinky) > PINCH_OTHERS_OUT;
+  p.near = p.othersOut && p.gap < PINCH_OFF;
+
+  // Thumb clearly open: the pinch is released, and armed if the fingers are straight.
+  if (p.gap > PINCH_OFF) {
+    p.down = false;
+    p.frames = 0;
+    p.armed = p.othersOut;
+    return false;
   }
-  const pinkyOpen = hand.fingers.pinky > PINKY_OPEN; // a closing fist isn't a pinch
-  if (pinchGap < PINCH_ON && pinkyOpen && !blocked) {
-    pinched = true;
-    game.hold();
-    startCooldown(now, 'HOLD!');
+  // Fingers curling (a fist forming) can never be a pinch, and must re-open first.
+  if (!p.othersOut) {
+    p.armed = false;
+    p.frames = 0;
+    return false;
   }
+  if (p.down || !p.armed || p.gap >= PINCH_ON) {
+    p.frames = 0;
+    return false;
+  }
+  // Looks like a pinch: confirm it over a couple of frames.
+  p.frames++;
+  if (p.frames < PINCH_CONFIRM_FRAMES) return false;
+  p.down = true;
+  p.armed = false;
+  p.frames = 0;
+  return !blocked;
 }
 
 // ---------- Action hand: wrist twist = rotate anticlockwise ----------
@@ -578,12 +607,12 @@ function updateStatus() {
   const moveExtra =
     column === null
       ? ''
-      : ` · COL ${column + 1}${fist ? ' · FIST' : ''} · PINCH ${movePinchGap.toFixed(2)}${movePinched ? ' ✓' : ''}`;
+      : ` · COL ${column + 1}${fist ? ' · FIST' : ''} · PINCH ${leftPinch.gap.toFixed(2)}${leftPinch.down ? ' ✓' : ''}`;
   const now = performance.now();
   const motionNote = isCoolingDown(now) ? ' · COOLDOWN' : handMotion > FAST_MOVE_DISTANCE ? ' · MOVING' : '';
   const actionExtra =
     ` · TWIST ${twistDelta >= 0 ? '+' : ''}${Math.round(twistDelta)}°${twistArmed ? '' : ' (re-arm)'}` +
-    ` · PINCH ${pinchGap.toFixed(2)}${pinched ? ' ✓' : ''}${motionNote}`;
+    ` · PINCH ${rightPinch.gap.toFixed(2)}${rightPinch.down ? ' ✓' : ''}${motionNote}`;
   statusEl.innerHTML =
     line('MOVE', moveSide, moveHand, 'move', moveExtra) +
     line('ACTION', actionSide, actionHand, 'action', actionExtra);
@@ -605,11 +634,12 @@ function renderDebug(now) {
     ['— MOVE HAND', '', '', false],
     ['column pos', mv ? n(columnPos) : '—', `±${COLUMN_HYSTERESIS} past edge`, false],
     ['curl (fist)', mv ? n(mv.curl) : '—', `on <${FIST_ON_CURL} · off >${FIST_OFF_CURL}`, fist],
-    ['pinch gap', mv ? n(movePinchGap) : '—', `rotate <${PINCH_ON} · reset >${PINCH_OFF}`, movePinched],
+    ['pinch gap', mv ? n(leftPinch.gap) : '—', `rotate <${PINCH_ON} · arm >${PINCH_OFF}`, leftPinch.down],
+    ['3 fingers out', mv ? n(Math.min(mv.fingers.middle, mv.fingers.ring, mv.fingers.pinky)) : '—', `>${PINCH_OTHERS_OUT} for pinch`, leftPinch.othersOut],
     ['— ACTION HAND', '', '', false],
     ['twist °', ac ? n(twistDelta, 0) : '—', `≤-${TWIST_TRIGGER_DEG} fire · ±${TWIST_REARM_DEG} re-arm`, !twistArmed],
-    ['pinch gap', ac ? n(pinchGap) : '—', `hold <${PINCH_ON} · reset >${PINCH_OFF}`, pinched],
-    ['pinky open', f ? n(f.pinky) : '—', `>${PINKY_OPEN}`, f && f.pinky > PINKY_OPEN],
+    ['pinch gap', ac ? n(rightPinch.gap) : '—', `hold <${PINCH_ON} · arm >${PINCH_OFF}`, rightPinch.down],
+    ['3 fingers out', f ? n(Math.min(f.middle, f.ring, f.pinky)) : '—', `>${PINCH_OTHERS_OUT} for pinch`, rightPinch.othersOut],
     ['motion', ac ? n(handMotion) : '—', `>${FAST_MOVE_DISTANCE} in ${MOTION_WINDOW_MS}ms blocks`, handMotion > FAST_MOVE_DISTANCE],
     ['curl (slam)', ac ? n(ac.curl) : '—', `fist <${SLAM_FIST_CURL} · re-open >${SLAM_OPEN_CURL}`, slamArmed],
     ['cooldown ms', n(cooldownLeft, 0), `${GESTURE_COOLDOWN_MS}`, cooldownLeft > 0],
