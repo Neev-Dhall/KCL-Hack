@@ -32,6 +32,12 @@ const PINCH_ON = 0.45; // thumb tip within this of index tip (↻) or middle tip
 const PINCH_OFF = 0.6; // released once the gap is above this
 const PINKY_OPEN = 1.0; // pinky tip must be this far from the wrist for a pinch to count
 
+// --- Action hand: fast downward swipe = slam (hard drop) ---
+const SLAM_WINDOW_MS = 220; // how much palm-position history we keep
+const SLAM_DISTANCE = 1.2; // palm moves this far DOWN within the window → slam
+const SLAM_COOLDOWN_MS = 600; // after a slam, ignore all action-hand gestures this long
+const FAST_MOVE_DISTANCE = 0.5; // hand moved this far within the window → no twists/grabs
+
 // ---------- MediaPipe setup ----------
 const MEDIAPIPE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const WASM_URL = MEDIAPIPE_URL + '/wasm';
@@ -76,6 +82,10 @@ let pinchCW = false; // thumb+index currently pinched
 let pinchCCW = false; // thumb+middle currently pinched
 let pinchIndexGap = 0; // latest pinch distances (shown in the status / debug)
 let pinchMiddleGap = 0;
+let palmHistory = []; // recent palm-centre positions: { t, x, y }
+let slamDrop = 0; // how far the palm fell within the window (palm lengths)
+let handMotion = 0; // how far the palm moved within the window (palm lengths)
+let cooldownUntil = 0; // performance.now() time when the post-slam cooldown ends
 
 // ---------- Setup ----------
 export async function initHands() {
@@ -147,7 +157,7 @@ export function updateHands() {
   const result = landmarker.detectForVideo(video, performance.now());
   assignRoles(result.landmarks || []);
   updateMoveHand();
-  updateActionHand();
+  updateActionHand(performance.now());
 
   drawOverlay();
   updateStatus();
@@ -217,18 +227,50 @@ function updateMoveHand() {
   }
 }
 
-// ---------- Action hand: rotate ----------
-function updateActionHand() {
+// ---------- Action hand ----------
+function updateActionHand(now) {
   if (!actionHand) {
     // Forget everything so the next time the hand appears it starts fresh.
     twistAngle = neutralAngle = null;
     twistDelta = 0;
     twistArmed = true;
     pinchCW = pinchCCW = false;
+    palmHistory = [];
+    slamDrop = handMotion = 0;
     return;
   }
-  if (twistMode) updateTwist(actionHand);
-  else updatePinch(actionHand);
+
+  updateSlam(actionHand, now);
+
+  // During the post-slam cooldown, or while the hand is moving fast,
+  // twists and pinches (and grabs, later) don't count.
+  const suppressed = isCoolingDown(now) || handMotion > FAST_MOVE_DISTANCE;
+  if (twistMode) updateTwist(actionHand, suppressed);
+  else updatePinch(actionHand, suppressed);
+}
+
+function isCoolingDown(now) {
+  return now < cooldownUntil;
+}
+
+// ---------- Action hand: slam ----------
+function updateSlam(hand, now) {
+  const p = hand.pts[9]; // palm centre, aspect-corrected
+  palmHistory.push({ t: now, x: p.x, y: p.y });
+  while (now - palmHistory[0].t > SLAM_WINDOW_MS) palmHistory.shift();
+
+  // Downward distance from the highest point in the window (y grows downward).
+  const highestY = Math.min(...palmHistory.map((h) => h.y));
+  slamDrop = (p.y - highestY) / hand.palm;
+  // Biggest distance between now and anywhere the palm was in the window.
+  handMotion = Math.max(...palmHistory.map((h) => dist(h, p))) / hand.palm;
+
+  if (isCoolingDown(now)) return;
+  if (slamDrop >= SLAM_DISTANCE) {
+    game.hardDrop();
+    cooldownUntil = now + SLAM_COOLDOWN_MS;
+    palmHistory = [palmHistory[palmHistory.length - 1]]; // start fresh after the slam
+  }
 }
 
 // Wrap an angle difference into -180..180 so 179° → -179° isn't a 358° jump.
@@ -236,7 +278,7 @@ function wrapDeg(a) {
   return ((((a + 180) % 360) + 360) % 360) - 180;
 }
 
-function updateTwist(hand) {
+function updateTwist(hand, suppressed) {
   // Angle of the line from the index knuckle (5) to the pinky knuckle (17).
   const a = hand.pts[5];
   const b = hand.pts[17];
@@ -248,6 +290,15 @@ function updateTwist(hand) {
     neutralAngle = raw;
   } else {
     twistAngle += TWIST_SMOOTHING * wrapDeg(raw - twistAngle);
+  }
+
+  if (suppressed) {
+    // Keep neutral glued to the hand, so whatever angle the hand ends up at
+    // after a swipe becomes the new neutral (no surprise rotation).
+    neutralAngle = twistAngle;
+    twistDelta = 0;
+    twistArmed = true;
+    return;
   }
 
   twistDelta = wrapDeg(twistAngle - neutralAngle) * TWIST_SIGN;
@@ -265,7 +316,7 @@ function updateTwist(hand) {
   }
 }
 
-function updatePinch(hand) {
+function updatePinch(hand, suppressed) {
   const p = hand.pts;
   pinchIndexGap = dist(p[4], p[8]) / hand.palm;
   pinchMiddleGap = dist(p[4], p[12]) / hand.palm;
@@ -274,7 +325,7 @@ function updatePinch(hand) {
   // Release first (always allowed), then look for a new pinch.
   if (pinchCW && pinchIndexGap > PINCH_OFF) pinchCW = false;
   if (pinchCCW && pinchMiddleGap > PINCH_OFF) pinchCCW = false;
-  if (!pinkyOpen) return; // a closing fist isn't a pinch
+  if (suppressed || !pinkyOpen) return; // no new pinches while swiping or making a fist
 
   if (!pinchCW && !pinchCCW && pinchIndexGap < PINCH_ON) {
     pinchCW = true;
@@ -334,6 +385,18 @@ function drawOverlay() {
   if (actionHand) drawSkeleton(actionHand, ACTION_COLOR);
 
   drawDial();
+
+  // Big "SLAM" on the action side while the cooldown runs.
+  if (isCoolingDown(performance.now())) {
+    octx.save();
+    octx.font = '16px "Press Start 2P", monospace';
+    octx.textAlign = 'center';
+    octx.fillStyle = ACTION_COLOR;
+    octx.shadowColor = ACTION_COLOR;
+    octx.shadowBlur = 12;
+    octx.fillText('SLAM!', swapped ? w * 0.25 : w * 0.75, h / 2);
+    octx.restore();
+  }
 }
 
 // Small dial in the action hand's bottom corner. "Up" is neutral; the
@@ -465,9 +528,12 @@ function updateStatus() {
   const line = (name, side, hand, cls, extra) =>
     `<div class="${cls}">${name} (${side}): ${hand ? 'TRACKING · curl ' + hand.curl.toFixed(2) + extra : 'not seen'}</div>`;
   const moveExtra = column === null ? '' : ` · COL ${column + 1}${fist ? ' · FIST' : ''}`;
-  const actionExtra = twistMode
+  let actionExtra = twistMode
     ? ` · TWIST ${twistDelta >= 0 ? '+' : ''}${Math.round(twistDelta)}°${twistArmed ? '' : ' (re-arm)'}`
     : ` · PINCH ${pinchIndexGap.toFixed(2)}/${pinchMiddleGap.toFixed(2)}`;
+  const now = performance.now();
+  const motionNote = isCoolingDown(now) ? ' · COOLDOWN' : handMotion > FAST_MOVE_DISTANCE ? ' · MOVING' : '';
+  actionExtra += ` · ↓${slamDrop.toFixed(1)}${motionNote}`;
   statusEl.innerHTML =
     line('MOVE', moveSide, moveHand, 'move', moveExtra) +
     line('ACTION', actionSide, actionHand, 'action', actionExtra) +
