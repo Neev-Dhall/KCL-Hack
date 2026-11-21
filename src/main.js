@@ -2,7 +2,7 @@
 // and runs the game loop.
 import './style.css';
 import * as game from './game.js';
-import { initHands, updateHands, swapHands, toggleTwistMode, toggleDebug } from './hands.js';
+import { initHands, updateHands, swapHands, toggleDebug } from './hands.js';
 import { unlockAudio, toggleMute, playEvent } from './sound.js';
 
 const guide = document.getElementById('guide');
@@ -35,9 +35,6 @@ window.addEventListener('keydown', (e) => {
         return;
       case 'KeyS':
         swapHands();
-        return;
-      case 'KeyT':
-        toggleTwistMode();
         return;
       case 'KeyD':
         toggleDebug();
