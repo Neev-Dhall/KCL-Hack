@@ -125,16 +125,19 @@ You go up a level every 10 lines. Gravity starts at 800 ms per row and gets 70 m
 
 ## 🌠 Bonus game: Hand Glide
 
-A second, one-button arcade game using the same hand tracking. Steer a glowing comet through gaps in neon laser gates over a synthwave grid. **Close either hand into a fist to flap.** Open it again, then make another fist for the next flap.
+A second arcade game using the same hand tracking. Steer a glowing comet through gaps in neon laser gates over a synthwave grid. It has two control modes (**T** switches):
+
+- **FLAP mode:** close either hand into a fist to flap. Open it again, then make another fist for the next flap.
+- **STEER mode:** the comet follows your palm's height. Raise your hand to climb and lower it to dive. If your hand leaves the camera, gravity takes over.
 
 | Start | In flight |
 |---|---|
 | <img src="docs/media/glide-start.png" alt="Hand Glide start screen: comet over a striped synthwave sun, MAKE A FIST TO FLAP"> | <img src="docs/media/glide-play.png" alt="Hand Glide in flight: comet with trail between neon laser gates"> |
 
 - Open it from the **PLAY HAND GLIDE ▶** link under the Hand Stack title, or go to `/glide.html`.
-- Keyboard and mouse work too: **Space**, **↑** or **click** to flap, **P** to pause, **M** to mute.
-- The gaps get narrower and the scroll speed rises as your score climbs. Every 10 gates plays a jingle and speeds up the music.
-- Your best score is kept in your browser.
+- Keyboard and mouse work too: **Space**, **↑** or **click** to flap, **T** to switch mode, **P** to pause, **D** for the debug panel, **M** to mute.
+- The gaps get narrower and the scroll speed rises as your score climbs. From 10 gates, some gates **slide up and down**. Every 10 gates plays a jingle and speeds up the music.
+- Crashes shake the screen and burst into sparks. Each mode keeps its own best score in your browser.
 
 ---
 
