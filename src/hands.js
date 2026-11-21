@@ -38,6 +38,11 @@ const SLAM_DISTANCE = 1.2; // palm moves this far DOWN within the window → sla
 const SLAM_COOLDOWN_MS = 600; // after a slam, ignore all action-hand gestures this long
 const FAST_MOVE_DISTANCE = 0.5; // hand moved this far within the window → no twists/grabs
 
+// --- Action hand: quick grab (open → fist) = hold ---
+const GRAB_OPEN_CURL = 1.4; // curl above this counts as an open hand
+const GRAB_CLOSED_CURL = 1.05; // curl below this counts as a fist
+const GRAB_MAX_MS = 300; // open → fist must happen within this time
+
 // ---------- MediaPipe setup ----------
 const MEDIAPIPE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const WASM_URL = MEDIAPIPE_URL + '/wasm';
@@ -86,6 +91,8 @@ let palmHistory = []; // recent palm-centre positions: { t, x, y }
 let slamDrop = 0; // how far the palm fell within the window (palm lengths)
 let handMotion = 0; // how far the palm moved within the window (palm lengths)
 let cooldownUntil = 0; // performance.now() time when the post-slam cooldown ends
+let grabArmed = false; // true once the hand has been seen open (re-armed by opening again)
+let lastOpenTime = 0; // last time the action hand was fully open
 
 // ---------- Setup ----------
 export async function initHands() {
@@ -237,16 +244,33 @@ function updateActionHand(now) {
     pinchCW = pinchCCW = false;
     palmHistory = [];
     slamDrop = handMotion = 0;
+    grabArmed = false;
     return;
   }
 
   updateSlam(actionHand, now);
 
   // During the post-slam cooldown, or while the hand is moving fast,
-  // twists and pinches (and grabs, later) don't count.
+  // twists, pinches and grabs don't count.
   const suppressed = isCoolingDown(now) || handMotion > FAST_MOVE_DISTANCE;
   if (twistMode) updateTwist(actionHand, suppressed);
   else updatePinch(actionHand, suppressed);
+  updateGrab(actionHand, now, suppressed);
+}
+
+// ---------- Action hand: grab ----------
+// A quick close from open hand to fist = hold the piece.
+function updateGrab(hand, now, suppressed) {
+  if (hand.curl > GRAB_OPEN_CURL) {
+    grabArmed = true;
+    lastOpenTime = now;
+    return;
+  }
+  if (grabArmed && hand.curl < GRAB_CLOSED_CURL) {
+    grabArmed = false; // must open again before the next grab
+    const quick = now - lastOpenTime <= GRAB_MAX_MS;
+    if (quick && !suppressed) game.hold();
+  }
 }
 
 function isCoolingDown(now) {
