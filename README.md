@@ -164,6 +164,7 @@ The code is split so each file has one job, and the hand code can only reach the
 | [`src/sound.js`](src/sound.js) | Sound effects and an original 4-bar chiptune loop (Am–F–C–G), played by a small step sequencer on the Web Audio clock. |
 | [`src/main.js`](src/main.js) | Wires it all together: keyboard, sound, music, screens and the game loop. |
 | [`src/glide.js`](src/glide.js) + [`glide.html`](glide.html) | Hand Glide: physics, gates, drawing and fist-to-flap, with all tuning numbers at the top. |
+| [`src/vision.js`](src/vision.js) + [`src/vision.worker.js`](src/vision.worker.js) | Runs MediaPipe in a **Web Worker** (a background thread) for both games. Camera frames are sent over as ImageBitmaps, and frames that arrive while the worker is busy are skipped, so tracking never freezes the game or builds up lag. |
 | [`src/tracker.js`](src/tracker.js) | Shared webcam + MediaPipe setup for Hand Glide: hand tracking, plus body-pose tracking for wing flapping (loaded on demand). |
 | [`vite.config.js`](vite.config.js) | Builds both pages. |
 
@@ -173,6 +174,7 @@ The code is split so each file has one job, and the hand code can only reach the
 - **Hysteresis everywhere:** columns, fists and pinches each have separate "on" and "off" thresholds, so nothing flickers at the edge.
 - **Self-calibrating twist:** the angle you first raise your hand at becomes neutral, and neutral slowly follows your hand while it rests. A 10° turn left rotates once. You come back to centre to re-arm, and turning right never triggers anything, so wobbling back can't double-rotate.
 - **Pinch vs fist:** a pinch is an "OK sign": thumb and index touching while the other three fingers stay straight. It has to *start* from an open thumb and hold for 2 frames. A fist curls those fingers, so closing or opening a fist can never count as a pinch.
+- **Never blocks the game:** hand and pose tracking run in a background Web Worker. Both games hold a steady 60 fps while tracking runs at the camera's ~30 fps.
 - **Motion guard:** after a slam or hold, the action hand is ignored for 600 ms. Twists don't count while the hand is moving fast or mid-pinch.
 
 ### Tuning

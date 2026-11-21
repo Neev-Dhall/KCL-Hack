@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 const root = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  // The tracking worker is an ES module (it imports MediaPipe from a CDN).
+  worker: { format: 'es' },
   build: {
     rollupOptions: {
       input: {

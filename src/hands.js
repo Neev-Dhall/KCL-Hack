@@ -1,6 +1,7 @@
 // hands.js — camera, hand tracking and gesture detection.
 // This file only talks to the game through game.js's exported API.
 import * as game from './game.js';
+import { Vision } from './vision.js';
 
 // =====================================================================
 // GESTURE THRESHOLDS — every tunable number lives here.
@@ -54,11 +55,7 @@ const SLAM_OPEN_CURL = 1.4; // hand must open above this before the next fist co
 const GESTURE_COOLDOWN_MS = 600; // ignore all action-hand gestures this long
 const RESTART_DELAY_MS = 1500; // on GAME OVER, wait this long before a fist can restart
 
-// ---------- MediaPipe setup ----------
-const MEDIAPIPE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
-const WASM_URL = MEDIAPIPE_URL + '/wasm';
-const MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+// (MediaPipe itself runs in a background worker: see vision.js / vision.worker.js.)
 
 // Landmark pairs that make up the hand skeleton.
 const CONNECTIONS = [
@@ -75,8 +72,7 @@ const ACTION_COLOR = '#ff2bd6'; // pink
 
 // ---------- State ----------
 let video, overlay, octx, statusEl;
-let landmarker = null;
-let lastVideoTime = -1;
+let vision = null; // background hand tracker (null until it has loaded)
 let swapped = false; // S key: left-handed mode
 let aspect = 4 / 3; // video width / height, for aspect-correct distances
 
@@ -136,21 +132,9 @@ export async function initHands() {
 
   try {
     setStatus('Loading hand tracker…');
-    const { FilesetResolver, HandLandmarker } = await import(/* @vite-ignore */ MEDIAPIPE_URL);
-    const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
-    const options = (delegate) => ({
-      baseOptions: { modelAssetPath: MODEL_URL, delegate },
-      runningMode: 'VIDEO',
-      numHands: 2,
-    });
-    try {
-      landmarker = await HandLandmarker.createFromOptions(fileset, options('GPU'));
-      delegateUsed = 'GPU';
-    } catch (gpuErr) {
-      console.warn('GPU delegate failed, using CPU:', gpuErr);
-      landmarker = await HandLandmarker.createFromOptions(fileset, options('CPU'));
-      delegateUsed = 'CPU';
-    }
+    const v = new Vision(video);
+    delegateUsed = await v.load('hand'); // 'GPU', or 'CPU' if the GPU failed
+    vision = v;
   } catch (err) {
     console.warn('Hand tracker failed to load:', err);
     showCameraMessage('TRACKER FAILED TO LOAD<br>Check your internet.<br>Keyboard still works.');
@@ -173,13 +157,11 @@ export function toggleDebug() {
 
 // ---------- Per-frame update (called from the game loop) ----------
 export function updateHands() {
-  if (!landmarker || video.readyState < 2) return;
-
-  // Only run detection once per new video frame.
-  if (video.currentTime === lastVideoTime) return;
-  lastVideoTime = video.currentTime;
-
-  const result = landmarker.detectForVideo(video, performance.now());
+  if (!vision) return;
+  // Detection runs in the background worker; this returns only when a new
+  // result has arrived (and sends the next camera frame if the worker is free).
+  const landmarks = vision.poll('hand');
+  if (!landmarks) return;
 
   // Count tracking frames per second for the debug panel.
   fpsFrames++;
@@ -188,7 +170,7 @@ export function updateHands() {
     fpsFrames = 0;
     fpsStart = performance.now();
   }
-  assignRoles(result.landmarks || []);
+  assignRoles(landmarks);
   updateMoveHand();
   updateActionHand(performance.now());
 
@@ -578,27 +560,29 @@ function drawSkeleton(hand, color) {
   const h = overlay.height;
   const px = (lm) => [(1 - lm.x) * w, lm.y * h]; // mirrored to match the video
 
+  // All bones in one path and all joints in another, so the glow is applied
+  // twice per hand instead of 42 times.
   octx.save();
   octx.strokeStyle = color;
   octx.fillStyle = color;
   octx.shadowColor = color;
   octx.shadowBlur = 8;
   octx.lineWidth = 2;
-
+  octx.beginPath();
   for (const [a, b] of CONNECTIONS) {
     const [x1, y1] = px(hand.landmarks[a]);
     const [x2, y2] = px(hand.landmarks[b]);
-    octx.beginPath();
     octx.moveTo(x1, y1);
     octx.lineTo(x2, y2);
-    octx.stroke();
   }
+  octx.stroke();
+  octx.beginPath();
   for (const lm of hand.landmarks) {
     const [x, y] = px(lm);
-    octx.beginPath();
+    octx.moveTo(x + 3, y);
     octx.arc(x, y, 3, 0, Math.PI * 2);
-    octx.fill();
   }
+  octx.fill();
   octx.restore();
 }
 
